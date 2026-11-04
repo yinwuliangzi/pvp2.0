@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>使用说明 · 洛克王国对战计算器</title>
+<style>
+  :root { --ink:#26231f; --muted:#8b8578; --card:#fff; --bg:#f5f1e8; --line:#ece6d8; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink); font:15px/1.75 "PingFang SC","Microsoft YaHei",sans-serif; }
+  .wrap { max-width:680px; margin:0 auto; padding:24px 18px 60px; }
+  h1 { font-size:22px; margin:0 0 4px; }
+  .sub { color:var(--muted); font-size:13px; margin:0 0 22px; }
+  h2 { font-size:16px; margin:26px 0 8px; padding-top:6px; border-top:1px solid var(--line); }
+  h2:first-of-type { border-top:0; }
+  p { margin:8px 0; }
+  ul { margin:8px 0; padding-left:20px; }
+  li { margin:4px 0; }
+  code { background:#efe9dc; padding:1px 5px; border-radius:5px; font-size:13px; }
+  .card { background:var(--card); border-radius:14px; padding:14px 16px; margin:10px 0; box-shadow:0 1px 2px rgba(60,50,30,.06); }
+  .muted { color:var(--muted); font-size:13px; }
+  .warn { background:#fff6e6; border-left:3px solid #e0a33f; padding:8px 12px; border-radius:8px; font-size:13.5px; margin:10px 0; }
+  a { color:#c9503c; }
+  .top { display:flex; gap:10px; flex-wrap:wrap; margin-bottom:6px; }
+  .top a { text-decoration:none; background:#fff; padding:8px 14px; border-radius:999px; font-size:14px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>使用说明</h1>
+  <p class="sub">这套工具解决三件事：这一下打多少、还要几发、这回合该想什么。</p>
+
+  <div class="top">
+    <a href="calculator.html">对战计算器 →</a>
+    <a href="fight.html">局面速算 →</a>
+  </div>
+
+  <h2>两个页面分别干什么</h2>
+  <div class="card">
+    <p><b>对战计算器</b>：选我方/敌方各 6 只，看每一招打多少、几发打倒；记录每回合的动作，自动推进“五段轮次”时间轴。</p>
+    <p><b>局面速算</b>：不管阵容，只填当前局面（血量、能量、先手、魔力值），马上给出“还差几次击杀 / 对手还能撑几轮 / 这轮谁先手”。</p>
+  </div>
+
+  <h2>第一次用，先做这一步：校准系数</h2>
+  <p>公式算出来的是“相对值”，要跟游戏里的真实伤害对一次。</p>
+  <ol>
+    <li>选好双方精灵、招式</li>
+    <li>游戏里打一下，记住实际伤害（比如 200）</li>
+    <li>把 200 填进「实测伤害」，点「校准」</li>
+  </ol>
+  <p class="muted">校准一次即可，同一套数据后续都准。换了公式版本会需要重校一次。</p>
+
+  <h2>阅读伤害卡</h2>
+  <ul>
+    <li><b>147（满血 42%）</b>：这一下打掉对方满血的 42%</li>
+    <li><b>一击 / 2 发 / 6 发</b>：还需要几发能打倒</li>
+    <li><b>本系加成 ×1.25</b>：技能属性和精灵属性相同</li>
+    <li><b>特性：威力+50%（先手）</b>：这条特性算进去了</li>
+    <li><b style="color:#b5762f">特性未计入：…</b>：这条特性现在算不了，伤害会偏少</li>
+  </ul>
+
+  <h2>记录回合怎么用</h2>
+  <ol>
+    <li>选「我方动作 / 对手动作」（出招、聚能、换人、应对、道具）</li>
+    <li>选本回合双方实际用的招式</li>
+    <li>（可选）贴一条策略标签，比如“低费混合试探”</li>
+    <li>点「记录本回合」——伤害、能量、魔力值、状态掉血会一起结算</li>
+  </ol>
+  <p>顶部时间条按 50 回合走，颜色是当前所处的轮次段：信息试探 / 能量压制 / 发育破局 / 兑现斩杀 / 残局收束。</p>
+
+  <h2>整局存档</h2>
+  <p>「导出记录」会把双方配置 + 全部回合历史存成一个 json 文件；「导入记录」读回来，换台电脑也能接着复盘。</p>
+
+  <h2>数据从哪来</h2>
+  <ul>
+    <li>精灵 <b>550</b> 只、技能 <b>840</b> 条、可学技能表 433 只、立绘 531 张</li>
+    <li>属性/种族值/特性/血脉/进化链：官方数据文件</li>
+    <li>状态与印记：官方 buff 表（含触发时机、叠加上限、免疫）</li>
+    <li>伤害公式：官方引擎结构（37/41 常数、本系 1.25、克制、特性、印记、连击）</li>
+  </ul>
+
+  <div class="warn">
+    <b>已知局限</b><br>
+    · 约 10 条“入场/离场/击败/每使用 N 次”类特性算不了，卡片会标黄提示<br>
+    · 双打只做了目标与群体技能口径，没有做双速先手与集火顺序<br>
+    · 进化之力没有校验“首领血脉”前置，只做提示<br>
+    · 各人数据存在自己浏览器里，不会上传，互不影响
+  </div>
+
+  <p class="muted" style="margin-top:26px">用着哪里不对，把当时的界面截图发出来，比描述快得多。</p>
+</div>
+</body>
+</html>
