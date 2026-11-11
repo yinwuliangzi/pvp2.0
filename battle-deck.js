@@ -897,6 +897,20 @@
     if (ev.target && ev.target.id === 'deClose') { hideEmbedded(); }
   }, true);
 
+  // 顶部「反推」：展开/收起反推面板
+  (function () {
+    var pb = document.getElementById('bdPredict');
+    if (!pb) return;
+    pb.addEventListener('click', function (ev) {
+      ev.stopPropagation();
+      var on = false;
+      try {
+        if (window.__pcTogglePredict) on = window.__pcTogglePredict();
+      } catch (e) {}
+      pb.classList.toggle('on', !!on);
+    });
+  })();
+
   window.__showDuelEmbedded = showEmbedded;
   window.__hideDuelEmbedded = hideEmbedded;
 
@@ -906,8 +920,10 @@
     var t = ev.target;
     while (t && t !== document.body) {
       if (t.classList && t.classList.contains('bd-tbtn')) {
+        var nm = t.getAttribute('data-duel');
+        if (!nm) return;              // 「反推」等非页面按钮，交给各自的监听
         ev.stopPropagation();
-        openPage(t.getAttribute('data-duel'));
+        openPage(nm);
         return;
       }
       t = t.parentNode;
