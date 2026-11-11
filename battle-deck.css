@@ -592,3 +592,28 @@ body.bd .bd-topbar ~ main.deck {
 .wb-btn:active{ transform:scale(.96); }
 .wb-pred{ background:rgba(61,127,214,.45); border-color:rgba(120,170,255,.6); }
 .wb-sep{ width:1px; height:18px; background:rgba(255,255,255,.22); margin:0 2px; }
+
+
+/* ---------- 完整作战视图（嵌入计算器作战页） ---------- */
+.fb-wrap{
+  position:fixed;
+  inset:0;
+  z-index:50;
+  display:flex;
+  padding:34px 0 46px;      /* 上下给悬浮栏让位 */
+  box-sizing:border-box;
+  background:rgba(18,22,30,.92);
+  backdrop-filter:blur(6px);
+}
+.fb-wrap[hidden]{ display:none !important; }
+.fb-body{
+  flex:1 1 auto;
+  width:100%;
+  border:0;
+  background:#f5f1e8;
+  border-radius:0;
+}
+/* 打开完整视图时，旧的三栏布局隐藏 */
+body.fb-on .bd-glow,
+body.fb-on .bubble,
+body.fb-on .deck { display:none !important; }

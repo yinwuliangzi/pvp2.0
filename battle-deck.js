@@ -930,3 +930,12 @@
     }
   }, true);
 })();
+
+
+/* 打开完整作战视图（嵌入计算器作战页） */
+(function () {
+  var wrap = document.getElementById('fullBattle');
+  if (!wrap) return;
+  document.body.classList.add('fb-on');
+  wrap.hidden = false;
+})();

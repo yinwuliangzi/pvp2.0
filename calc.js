@@ -6674,6 +6674,48 @@
   }
   window.__openOverlayWindow = openOverlayWindow;
 
+  /** 被悬浮框嵌入时（?embed=1）：隐藏顶部按钮与浮动按钮，只留内容 */
+  function runEmbedMode() {
+    if (!/[?&]embed=1/.test(location.search)) return;
+    document.body.classList.add("embed-mode");
+
+    // 隐藏计算器自己的顶部按钮与浮动按钮
+    var top = document.querySelector(".topbar");
+    if (top) top.style.display = "none";
+    var appbar = document.querySelector(".appbar");
+    if (appbar) appbar.style.display = "none";
+    ["hudToggle", "overlayBtn", "miniToggle"].forEach(function (id) {
+      var el = document.getElementById(id);
+      if (el) el.style.display = "none";
+    });
+
+    // 默认切到「对战」视图：直接改 class 和 id
+    var tries = 0;
+    var timer = setInterval(function () {
+      tries++;
+      var battle = document.getElementById("view-battle");
+      if (battle) {
+        Array.prototype.forEach.call(document.querySelectorAll(".view"), function (v) { v.classList.remove("on"); });
+        Array.prototype.forEach.call(document.querySelectorAll(".tab"), function (t) { t.classList.remove("on"); });
+        battle.classList.add("on");
+        var bt = document.querySelector('.tabbar .tab[data-view="battle"]');
+        if (bt) bt.classList.add("on");
+        clearInterval(timer);
+      } else if (tries > 30) {
+        clearInterval(timer);
+      }
+      if (tries > 30) {
+        var bar = document.querySelector(".tabbar");
+        if (bar) bar.style.display = "none";
+      }
+    }, 100);
+  }
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", runEmbedMode);
+  } else {
+    runEmbedMode();
+  }
+
   // 悬浮录入面板：4 个招式按钮 + 聚能/换人/应对 + 记录/撤销
   function initMiniPanel() {
     var panel = $("miniPanel"), toggle = $("miniToggle");
