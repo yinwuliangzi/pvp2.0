@@ -6643,6 +6643,13 @@
   /** 打开发战面板（悬浮窗）：安卓用原生悬浮层，浏览器/电脑用独立窗口 */
   function openOverlayWindow() {
     try {
+      // 电脑版：调起悬浮层窗口（只有应用内打开的页面才有这个桥）
+      if (window.pcHud && typeof window.pcHud.showOverlay === "function") {
+        window.pcHud.showOverlay();
+        return;
+      }
+    } catch (e) {}
+    try {
       // 安卓：MainActivity 的桥叫 startOverlay
       if (window.Android && typeof window.Android.startOverlay === "function") {
         window.Android.startOverlay();
@@ -6678,9 +6685,16 @@
         });
       }
       var ovBtn = $("overlayBtn");
-      if (ovBtn && !ovBtn.__bound) {
-        ovBtn.__bound = true;
-        ovBtn.addEventListener("click", function () { openOverlayWindow(); });
+      if (ovBtn) {
+        // 没有原生桥（普通浏览器）时这个按钮点了也没用，直接藏掉
+        var hasBridge = (window.pcHud && typeof window.pcHud.showOverlay === "function") ||
+                        (window.Android && typeof window.Android.startOverlay === "function");
+        if (!hasBridge) {
+          ovBtn.style.display = "none";
+        } else if (!ovBtn.__bound) {
+          ovBtn.__bound = true;
+          ovBtn.addEventListener("click", function () { openOverlayWindow(); });
+        }
       }
       return;
     }

@@ -858,6 +858,8 @@
     winrate: 'winrate.html'
   };
 
+  var TITLES = { matrix: '对战矩阵', route: '对局路径', winrate: '胜率估计' };
+
   function openPage(name) {
     var file = PAGES[name];
     if (!file) return;
@@ -866,26 +868,37 @@
       btn.classList.add('on');
       setTimeout(function () { btn.classList.remove('on'); }, 900);
     }
-
-    // 1) 电脑版：走 Electron 桥，开一个独立窗口
-    try {
-      if (window.pcHud && typeof window.pcHud.openDuelPage === 'function') {
-        window.pcHud.openDuelPage(name);
-        return;
-      }
-    } catch (e) {}
-
-    // 2) 安卓：走原生桥，开一个浮层 WebView
-    try {
-      if (window.AndroidHud && typeof window.AndroidHud.openDuelPage === 'function') {
-        window.AndroidHud.openDuelPage(name);
-        return;
-      }
-    } catch (e) {}
-
-    // 3) 兜底：浏览器里新开标签
-    window.open(file, '_blank');
+    showEmbedded(name, file);
   }
+
+  /** 在悬浮框内部显示，不跳转网页 */
+  function showEmbedded(name, file) {
+    var wrap = document.getElementById('duelEmbed');
+    var body = document.getElementById('deBody');
+    var title = document.getElementById('deTitle');
+    if (!wrap || !body) {
+      window.open(file, '_blank');
+      return;
+    }
+    if (title) title.textContent = TITLES[name] || name;
+    body.src = file + '?embed=1&t=' + Date.now();
+    wrap.hidden = false;
+  }
+
+  function hideEmbedded() {
+    var wrap = document.getElementById('duelEmbed');
+    var body = document.getElementById('deBody');
+    if (!wrap) return;
+    wrap.hidden = true;
+    if (body) body.src = 'about:blank';
+  }
+
+  document.addEventListener('click', function (ev) {
+    if (ev.target && ev.target.id === 'deClose') { hideEmbedded(); }
+  }, true);
+
+  window.__showDuelEmbedded = showEmbedded;
+  window.__hideDuelEmbedded = hideEmbedded;
 
   window.__openDuelPage = openPage;
 

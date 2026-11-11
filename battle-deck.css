@@ -514,3 +514,45 @@ body.bd .bd-topbar ~ main.deck {
   body.bd .bd-topbar ~ .deck,
   body.bd .bd-topbar ~ main.deck { margin-top: 22px; }
 }
+
+
+/* ---------- 三个功能页的嵌入面板 ---------- */
+.de-wrap{
+  position:fixed;
+  inset:0;
+  z-index:99999;
+  display:flex;
+  flex-direction:column;
+  background:#0F1115;
+}
+.de-wrap[hidden]{ display:none !important; }
+.de-bar{
+  display:flex;
+  align-items:center;
+  gap:10px;
+  flex:0 0 auto;
+  padding:7px 14px;
+  background:#161A21;
+  border-bottom:1px solid #262C38;
+  color:#D6D8DC;
+  font:600 13.5px/1.4 "Microsoft YaHei","PingFang SC",system-ui,sans-serif;
+}
+.de-bar b{ font-weight:700; }
+.de-close{
+  margin-left:auto;
+  width:28px; height:28px;
+  border-radius:8px;
+  border:1px solid #2E3646;
+  background:#1B202A;
+  color:#D6D8DC;
+  font-size:17px; line-height:1;
+  cursor:pointer;
+}
+.de-close:hover{ background:#252C39; }
+.de-body{
+  flex:1 1 auto;
+  width:100%;
+  border:0;
+  display:block;
+  background:#0F1115;
+}
