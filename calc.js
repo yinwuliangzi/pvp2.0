@@ -6639,6 +6639,30 @@
     } catch (e) {}
   }
 
+  /** 打开发战面板（悬浮窗）：安卓用原生悬浮层，浏览器/电脑用独立窗口 */
+  function openOverlayWindow() {
+    try {
+      // 安卓：MainActivity 的桥叫 startOverlay
+      if (window.Android && typeof window.Android.startOverlay === "function") {
+        window.Android.startOverlay();
+        return;
+      }
+      if (window.Android && typeof window.Android.showOverlay === "function") {
+        window.Android.showOverlay();
+        return;
+      }
+    } catch (e) {}
+    var w = window.open(
+      "battle-deck.html?layer=back",
+      "luokeOverlay",
+      "width=" + (window.screen.width || 1280) + ",height=" + (window.screen.height || 800) +
+      ",menubar=no,toolbar=no,location=no,status=no"
+    );
+    if (w) { try { w.focus(); } catch (e) {} }
+    return w;
+  }
+  window.__openOverlayWindow = openOverlayWindow;
+
   // 悬浮录入面板：4 个招式按钮 + 聚能/换人/应对 + 记录/撤销
   function initMiniPanel() {
     var panel = $("miniPanel"), toggle = $("miniToggle");
@@ -6651,6 +6675,11 @@
           var w = window.open("calculator.html?hud=1", "luokeHud", "width=380,height=760,menubar=no,toolbar=no");
           if (w) w.focus();
         });
+      }
+      var ovBtn = $("overlayBtn");
+      if (ovBtn && !ovBtn.__bound) {
+        ovBtn.__bound = true;
+        ovBtn.addEventListener("click", function () { openOverlayWindow(); });
       }
       return;
     }

@@ -849,3 +849,55 @@
     if (cached) setTimeout(function () { window.__lsApplyScan(JSON.parse(cached)); }, 400);
   } catch (e) {}
 
+
+/* ---------- 顶部三个功能页：桌面/手机各自用原生窗口打开 ---------- */
+(function () {
+  var PAGES = {
+    matrix: 'matrix.html',
+    route: 'route.html',
+    winrate: 'winrate.html'
+  };
+
+  function openPage(name) {
+    var file = PAGES[name];
+    if (!file) return;
+    var btn = document.querySelector('.bd-tbtn[data-duel="' + name + '"]');
+    if (btn) {
+      btn.classList.add('on');
+      setTimeout(function () { btn.classList.remove('on'); }, 900);
+    }
+
+    // 1) 电脑版：走 Electron 桥，开一个独立窗口
+    try {
+      if (window.pcHud && typeof window.pcHud.openDuelPage === 'function') {
+        window.pcHud.openDuelPage(name);
+        return;
+      }
+    } catch (e) {}
+
+    // 2) 安卓：走原生桥，开一个浮层 WebView
+    try {
+      if (window.AndroidHud && typeof window.AndroidHud.openDuelPage === 'function') {
+        window.AndroidHud.openDuelPage(name);
+        return;
+      }
+    } catch (e) {}
+
+    // 3) 兜底：浏览器里新开标签
+    window.open(file, '_blank');
+  }
+
+  window.__openDuelPage = openPage;
+
+  document.addEventListener('click', function (ev) {
+    var t = ev.target;
+    while (t && t !== document.body) {
+      if (t.classList && t.classList.contains('bd-tbtn')) {
+        ev.stopPropagation();
+        openPage(t.getAttribute('data-duel'));
+        return;
+      }
+      t = t.parentNode;
+    }
+  }, true);
+})();

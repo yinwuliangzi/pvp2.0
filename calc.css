@@ -281,6 +281,7 @@ details.fold[open] > summary::before { content:"▾ "; }
 @media (max-width: 420px) { .mini-panel { width:200px; right:8px; } }
 
 .mini-toggle-2 { right:14px; bottom:130px; }
+.mini-toggle-3 { right:14px; bottom:182px; }
 body.hud-mode .tabbar, body.hud-mode #tabs, body.hud-mode .topbar { display:none !important; }
 body.hud-mode .view:not([data-view="battle"]) { display:none !important; }
 body.hud-mode .view[data-view="battle"] { display:block !important; padding-top:8px; }

@@ -454,3 +454,63 @@ body.pd-open .bd-stage > *:not(#predict) {
   transition: opacity .18s ease, filter .18s ease;
 }
 body.pd-open .bd-stage { overflow: visible !important; }
+
+
+/* ---------- 顶部三个功能页入口 ---------- */
+.bd-topbar{
+  position:absolute;
+  top:3px;
+  left:50%;
+  transform:translateX(-50%);
+  display:flex;
+  gap:5px;
+  z-index:60;
+  pointer-events:auto;
+  padding:2px 4px;
+  border-radius:9px;
+}
+.bd-tbtn{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  min-width:64px;
+  height:26px;
+  padding:0 11px;
+  border-radius:8px;
+  border:1px solid rgba(255,255,255,.34);
+  background:rgba(20,26,38,.62);
+  backdrop-filter:blur(6px);
+  color:#dbe6ff;
+  font:12px/1 "Microsoft YaHei","PingFang SC",system-ui,sans-serif;
+  cursor:pointer;
+  white-space:nowrap;
+  transition:background .12s,border-color .12s,transform .12s;
+}
+.bd-tbtn:hover{background:rgba(45,63,105,.85);border-color:rgba(120,160,255,.7)}
+.bd-tbtn:active{transform:scale(.96)}
+.bd-tbtn.on{background:#2A3A63;border-color:#4D6BFE;color:#C3CDFF}
+
+/* 手机窄屏：缩小并允许换行 */
+@media (max-width:520px){
+  .bd-topbar{top:4px;gap:4px}
+  .bd-tbtn{min-width:54px;height:23px;padding:0 8px;font-size:11px}
+}
+
+/* 手机竖屏/窄宽：deck 用两列，避免我方水泡被挤成一条 */
+@media (max-width:760px){
+  .bd-stage{grid-template-columns:minmax(150px,1fr) 2fr !important;gap:6px !important}
+  .bubble .bubble-list{overflow-y:auto}
+  .bubble{min-width:0}
+  .deck{min-width:0}
+}
+
+
+/* 顶栏占位：给主面板留出空间 */
+body.bd .bd-topbar ~ .deck,
+body.bd .bd-topbar ~ main.deck {
+  margin-top: 26px;
+}
+@media (max-width:520px){
+  body.bd .bd-topbar ~ .deck,
+  body.bd .bd-topbar ~ main.deck { margin-top: 22px; }
+}
