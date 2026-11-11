@@ -6642,15 +6642,15 @@
 
   /** 打开发战面板（悬浮窗）：安卓用原生悬浮层，浏览器/电脑用独立窗口 */
   function openOverlayWindow() {
+    // 电脑版（应用内窗口）
     try {
-      // 电脑版：调起悬浮层窗口（只有应用内打开的页面才有这个桥）
       if (window.pcHud && typeof window.pcHud.showOverlay === "function") {
         window.pcHud.showOverlay();
         return;
       }
     } catch (e) {}
+    // 安卓
     try {
-      // 安卓：MainActivity 的桥叫 startOverlay
       if (window.Android && typeof window.Android.startOverlay === "function") {
         window.Android.startOverlay();
         return;
@@ -6660,14 +6660,17 @@
         return;
       }
     } catch (e) {}
+    // 普通浏览器：打开悬浮窗页面（自带底部栏，因为 desktop=1）
+    var url = "battle-deck.html?layer=back&desktop=1";
     var w = window.open(
-      "battle-deck.html?layer=back",
+      url,
       "luokeOverlay",
       "width=" + (window.screen.width || 1280) + ",height=" + (window.screen.height || 800) +
       ",menubar=no,toolbar=no,location=no,status=no"
     );
-    if (w) { try { w.focus(); } catch (e) {} }
-    return w;
+    if (w) { try { w.focus(); } catch (e) {} return w; }
+    // 弹窗被拦截，就在本页打开
+    location.href = url;
   }
   window.__openOverlayWindow = openOverlayWindow;
 
@@ -6685,16 +6688,10 @@
         });
       }
       var ovBtn = $("overlayBtn");
-      if (ovBtn) {
-        // 没有原生桥（普通浏览器）时这个按钮点了也没用，直接藏掉
-        var hasBridge = (window.pcHud && typeof window.pcHud.showOverlay === "function") ||
-                        (window.Android && typeof window.Android.startOverlay === "function");
-        if (!hasBridge) {
-          ovBtn.style.display = "none";
-        } else if (!ovBtn.__bound) {
-          ovBtn.__bound = true;
-          ovBtn.addEventListener("click", function () { openOverlayWindow(); });
-        }
+      if (ovBtn && !ovBtn.__bound) {
+        ovBtn.__bound = true;
+        ovBtn.style.display = "";    // 始终显示
+        ovBtn.addEventListener("click", function () { openOverlayWindow(); });
       }
       return;
     }
