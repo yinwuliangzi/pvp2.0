@@ -6642,7 +6642,18 @@
   // 悬浮录入面板：4 个招式按钮 + 聚能/换人/应对 + 记录/撤销
   function initMiniPanel() {
     var panel = $("miniPanel"), toggle = $("miniToggle");
-    if (!panel || !toggle) return;
+    // 悬浮录入面板已移除，仅保留「小窗」按钮逻辑
+    if (!panel || !toggle) {
+      var hudOnly = $("hudToggle");
+      if (hudOnly && !hudOnly.__bound) {
+        hudOnly.__bound = true;
+        hudOnly.addEventListener("click", function () {
+          var w = window.open("calculator.html?hud=1", "luokeHud", "width=380,height=760,menubar=no,toolbar=no");
+          if (w) w.focus();
+        });
+      }
+      return;
+    }
     if (panel.getAttribute("data-ready") === "1") return;
     panel.setAttribute("data-ready", "1");
 
