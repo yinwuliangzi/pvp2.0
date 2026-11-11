@@ -17,7 +17,9 @@
 <div class="app" id="app">
   <header class="topbar">
     <div class="title">对战计算器</div>
-    <button type="button" class="share-btn" id="duelGo">对战矩阵</button>
+    <button type="button" class="share-btn duel-nav-btn" data-duel="matrix">对战矩阵</button>
+    <button type="button" class="share-btn duel-nav-btn" data-duel="route">对局路径</button>
+    <button type="button" class="share-btn duel-nav-btn" data-duel="winrate">胜率估计</button>
     <button type="button" class="share-btn" id="relayShow">接抓包</button>
     <button type="button" class="share-btn" id="ocrOpen">截图识别</button>
     <button type="button" class="share-btn" id="covBtn">自检</button>
@@ -376,10 +378,13 @@
 </div>
 <script>
 (function () {
-  // 对战矩阵入口：把当前双方阵容导出给三个对战页面
-  var btn = document.getElementById('duelGo');
-  if (!btn) return;
-  btn.addEventListener('click', function () {
+  // 三个对战页面入口：把当前双方阵容导出后再跳转
+  var btns = document.querySelectorAll('.duel-nav-btn');
+  if (!btns.length) return;
+  Array.prototype.forEach.call(btns, function (b) {
+    b.addEventListener('click', function () { goPage(b.getAttribute('data-duel')); });
+  });
+  function goPage(name) {
     // 优先用完整引擎（含特性/印记/道具/天气/当前增益），不可用时退回简化版
     var fnFull = window.__lsDuelDataFull;
     var fnSimple = window.__lsDuelData;
@@ -390,8 +395,9 @@
     if ((!d || !d.ok) && typeof fnSimple === 'function') { d = fnSimple(); }
     if (!d || !d.ok) { alert('导出失败：' + ((d && d.why) || '未知')); return; }
     try { localStorage.setItem('luoke.duel.data', JSON.stringify(d)); } catch (e) {}
-    location.href = 'matrix.html';
-  });
+    var PAGES = { matrix: 'matrix.html', route: 'route.html', winrate: 'winrate.html' };
+    location.href = PAGES[name] || 'matrix.html';
+  }
 })();
 </script>
 </body>
