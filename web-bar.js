@@ -4,9 +4,9 @@
 (function () {
   if (window.__pcHudReady) return;              // 电脑版 App 已接管
   if (window.Android || window.AppHud) return;  // 安卓原生悬浮层
-  var desktop = /[?&]desktop=1/.test(location.search);
-  var embed = /[?&]embed=1/.test(location.search);
-  if (embed) return;                            // 嵌入面板里不需要底栏
+  // desktop=1 由电脑版 App 打开（已有原生底部栏），web-bar 不要重复画
+  if (/[?&]desktop=1/.test(location.search)) return;
+  if (/[?&]embed=1/.test(location.search)) return;   // 嵌入面板里不需要底栏
 
   function page(name) {
     var map = { matrix: 'matrix.html', route: 'route.html', winrate: 'winrate.html' };
