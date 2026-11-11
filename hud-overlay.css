@@ -1,0 +1,106 @@
+/* 悬浮 HUD：只保留小动作键，透明覆盖游戏，不加载 deck 背景 */
+html, body.hud-only { margin:0; height:100%; background:transparent !important; }
+body.hud-only {
+  overflow:hidden; color:#f4f1e8; user-select:none;
+  font:12px/1.35 "PingFang SC","Microsoft YaHei",system-ui,sans-serif;
+}
+.hud-only .bd-stage, .hud-only .bubble, .hud-only .analysis, .hud-only .predict { display:none !important; }
+
+.hud-only .hud {
+  position:fixed; inset:0; display:block;
+  background:transparent; border:0; box-shadow:none;
+  padding:0; pointer-events:none;
+  backdrop-filter:none !important; -webkit-backdrop-filter:none !important;
+}
+.hud-only .hud-top {
+  position:absolute; top:8px; left:8px; right:8px;
+  display:flex; align-items:center; gap:6px;
+  background:rgba(8,12,18,.42); border:1px solid rgba(255,255,255,.16);
+  border-radius:9px; padding:4px 8px; width:max-content; max-width:92vw;
+  pointer-events:auto; backdrop-filter:blur(4px);
+}
+.hud-only .hud-top b { font-size:12px; color:#fff; }
+.hud-only .hud-top span { font-size:10px; color:#d8d1c4; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:44vw; }
+.hud-only .hud-gear { width:20px; height:20px; font-size:10px; }
+
+.hud-only .hud-names {
+  position:absolute; top:38px; left:8px; right:8px;
+  display:flex; justify-content:space-between; align-items:center;
+  pointer-events:none;
+}
+.hud-only .side-name { display:flex; align-items:center; gap:5px; text-shadow:0 1px 3px rgba(0,0,0,.8); }
+.hud-only .side-name b { font-size:13px; }
+.hud-only .side-name em { font-size:9px; padding:1px 5px; border-radius:4px; background:rgba(0,0,0,.45); }
+
+.hud-only .hud-body {
+  position:absolute; left:0; right:0; bottom:calc(48px + env(safe-area-inset-bottom));
+  display:flex; justify-content:space-between; align-items:flex-end;
+  padding:0 8px; pointer-events:none;
+}
+.hud-only .hud-col { display:flex; pointer-events:auto; }
+.hud-only .hud-col.mine { justify-content:flex-start; }
+.hud-only .hud-col.foe { justify-content:flex-end; }
+.hud-only .hud-slots { display:flex; flex-direction:column; gap:4px; width:clamp(88px, 11vw, 128px); }
+.hud-only .slot {
+  min-height:clamp(26px, 3.4vh, 32px); width:100%; font-size:clamp(10px, 0.95vw, 11.5px);
+  font-weight:700; padding:0 8px; border-radius:8px; justify-content:flex-start;
+  background:rgba(10,14,20,.46); border:1px solid rgba(255,255,255,.30);
+  backdrop-filter:blur(3px); -webkit-backdrop-filter:blur(3px);
+  box-shadow:0 3px 10px rgba(0,0,0,.28);
+}
+.hud-only .slot.attack { background:rgba(61,127,214,.50); border-color:rgba(150,200,255,.55); }
+.hud-only .hud-col.foe .slot.attack { background:rgba(190,80,60,.50); border-color:rgba(255,170,150,.55); }
+.hud-only .slot.on { border-color:#ffd479; box-shadow:0 0 0 1px rgba(255,212,121,.45); }
+.hud-only .slot i { width:20px; height:20px; font-size:9px; border-radius:5px; }
+.hud-only .hud-col .slot span { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+
+.hud-only .orbs {
+  position:fixed; left:50%; top:auto; bottom:calc(8px + env(safe-area-inset-bottom));
+  transform:translateX(-50%); z-index:50; height:auto;
+  display:flex; align-items:center; gap:6px;
+  background:rgba(8,12,18,.46); border:1px solid rgba(255,255,255,.16);
+  border-radius:999px; padding:4px 8px; pointer-events:auto;
+}
+.hud-only .orb {
+  width:24px; height:24px; border-radius:50%; padding:0;
+  border:1px solid rgba(255,255,255,.55); background:rgba(0,0,0,.24);
+  color:#fff; font:inherit; font-size:10px; font-weight:700;
+  display:grid; place-items:center; cursor:pointer; opacity:.85;
+}
+.hud-only .flip {
+  height:19px; padding:0 7px; border-radius:999px; cursor:pointer;
+  border:1px solid rgba(255,255,255,.28); background:rgba(0,0,0,.22);
+  color:#e9e4d8; font:inherit; font-size:9px;
+}
+.hud-only.flipped .hud-body { align-items:flex-start; top:68px; bottom:auto; }
+.hud-only.flipped .hud-body .hud-slots { flex-direction:column-reverse; }
+
+.hud-only .toast {
+  position:fixed; left:50%; bottom:calc(42px + env(safe-area-inset-bottom));
+  transform:translateX(-50%); padding:5px 10px; border-radius:7px;
+  background:rgba(0,0,0,.78); color:#fff; font-size:11px;
+  opacity:0; pointer-events:none; transition:opacity .2s; z-index:60;
+}
+.hud-only .toast.on { opacity:1; }
+.hud-only #engineHost { display:none !important; }
+
+/* 第一层：中间固定信息，不拦截触摸 */
+.hud-only .center-info {
+  position:fixed; left:50%; top:50%; transform:translate(-50%,-50%);
+  width:clamp(300px, 42vw, 520px); padding:7px 10px;
+  border-radius:12px; pointer-events:none;
+  background:rgba(8,12,18,.38); border:1px solid rgba(255,255,255,.16);
+  backdrop-filter:blur(3px); -webkit-backdrop-filter:blur(3px);
+  color:#e9e3d6; text-shadow:0 1px 2px rgba(0,0,0,.6);
+}
+.hud-only .center-info .ci-title { font-size:12px; font-weight:700; margin-bottom:3px; }
+.hud-only .center-info .ci-line { font-size:10.5px; line-height:1.45; color:#d8d1c4; }
+.hud-only .center-info .ci-chips { display:flex; flex-wrap:wrap; gap:3px; margin-top:4px; }
+.hud-only .center-info .ci-chips span { font-size:8.5px; padding:1px 5px; border-radius:99px; background:rgba(255,255,255,.08); }
+
+/* 第二层前景：不重复显示 deck 的中心信息 */
+.hud-only .center-info { display:none !important; }
+
+/* 第二层只保留操作列，顶部信息由第一层 deck 提供，避免重复 */
+.hud-only .hud-top, .hud-only .hud-names { display:flex !important; }
+.hud-only .hud-body { bottom:calc(16px + env(safe-area-inset-bottom)); }

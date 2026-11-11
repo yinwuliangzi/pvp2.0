@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>悬浮框 · 临时预览</title>
+<style>
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;overflow:hidden;background:#111;font:12px/1.35 "PingFang SC","Microsoft YaHei",system-ui,sans-serif;color:#f4f1e8}
+.game-bg{position:fixed;inset:0;background:url("overlay-bg.png") center/cover no-repeat;filter:brightness(.82) saturate(.95)}
+.tip{position:fixed;top:10px;right:12px;z-index:5;font-size:10px;color:#e8e1d2;background:rgba(0,0,0,.45);padding:4px 8px;border-radius:99px}
+.tip a{color:#ffd479;text-decoration:none;margin-left:6px}
+.topbar{position:fixed;top:8px;left:8px;z-index:10;display:flex;align-items:center;gap:6px;background:rgba(8,12,18,.5);border:1px solid rgba(255,255,255,.18);border-radius:9px;padding:4px 8px;backdrop-filter:blur(4px)}
+.topbar b{font-size:12px}.topbar span{font-size:10px;color:#d8d1c4;max-width:44vw;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.names{position:fixed;top:42px;left:8px;right:8px;z-index:10;display:flex;justify-content:space-between;pointer-events:none}
+.names b{font-size:13px;text-shadow:0 1px 3px #000}.names em{font-style:normal;font-size:9px;background:rgba(0,0,0,.45);padding:1px 5px;border-radius:4px}
+.center{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);z-index:8;width:clamp(300px,42vw,520px);padding:8px 10px;border-radius:12px;background:rgba(8,12,18,.48);border:1px solid rgba(255,255,255,.18);backdrop-filter:blur(4px);display:none;pointer-events:none}
+.center.on{display:block}
+.center h3{margin:0 0 3px;font-size:12px}.center p{margin:1px 0;font-size:10.5px;color:#d8d1c4}
+.chips{display:flex;gap:3px;flex-wrap:wrap;margin-top:4px}.chips span{font-size:8.5px;padding:1px 5px;border-radius:99px;background:rgba(255,255,255,.09)}
+.dock{position:fixed;left:50%;bottom:8px;transform:translateX(-50%);z-index:20;display:flex;align-items:center;gap:3px;padding:4px 6px;border-radius:18px;background:rgba(8,12,18,.55);border:1px solid rgba(255,255,255,.18);backdrop-filter:blur(5px);max-width:96vw}
+.dock .btns{display:flex;gap:2px;align-items:center}
+.dock button{height:30px;min-width:38px;padding:0 7px;border-radius:8px;border:1px solid rgba(255,255,255,.28);background:rgba(255,255,255,.10);color:#eee;font:inherit;font-size:10.5px;cursor:pointer;white-space:nowrap}
+.dock button.mine{color:#dcebff;border-color:rgba(140,190,255,.55)}
+.dock button.foe{color:#ffd8d0;border-color:rgba(255,160,140,.55)}
+.dock button#toggle{color:#ffe0a0;border-color:rgba(255,212,121,.6);background:rgba(255,212,121,.12)}
+.dock button:active{transform:scale(.96)}
+.toast{position:fixed;left:50%;bottom:52px;transform:translateX(-50%);z-index:30;padding:5px 10px;border-radius:7px;background:rgba(0,0,0,.8);font-size:11px;opacity:0;transition:opacity .18s;pointer-events:none}
+.toast.on{opacity:1}
+.log{position:fixed;left:10px;bottom:8px;z-index:15;font-size:9.5px;color:#c9c2b4;background:rgba(0,0,0,.35);padding:4px 7px;border-radius:6px;max-width:32vw;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+@media (max-width:700px){.dock button{min-width:32px;padding:0 5px;font-size:9.5px}.dock{max-width:99vw}}
+</style>
+</head>
+<body>
+<div class="game-bg"></div>
+<div class="tip">悬浮框临时预览 · <a href="calculator.html">打开计算器</a></div>
+<div class="topbar"><b id="turn">第 1 回合</b><span>一键模式：点招式＝记录</span></div>
+<div class="names"><span><b id="mineName">迪莫</b> <em>光</em></span><span><em>火</em> <b id="foeName">焰火</b></span></div>
+
+<div class="center" id="center">
+  <h3 id="ciTitle">第 1 回合 · 信息试探</h3>
+  <p>先后手：按当前速度判定</p>
+  <p>对手推测：聚能 57% ／ 暴风眼 43%</p>
+  <div class="chips"><span>信息试探 1–4</span><span>能量压制 5–10</span><span>发育破局 11–16</span><span>兑现斩杀 17–24</span><span>残局收束 25–50</span></div>
+</div>
+
+<div class="dock" id="dock">
+  <button type="button" id="toggle">展开</button>
+  <div class="btns" id="btns" style="display:none">
+    <button class="mine" data-side="mine" data-act="attack">出招</button>
+    <button data-side="mine" data-act="charge">聚能</button>
+    <button data-side="mine" data-act="switch">换人</button>
+    <button data-side="mine" data-act="item">道具</button>
+    <button data-side="ui" data-act="team">队</button>
+    <button data-side="ui" data-act="scan">识</button>
+    <button data-side="ui" data-act="close">关</button>
+    <button data-side="ui" data-act="page">页面</button>
+    <button class="foe" data-side="foe" data-act="attack">出招</button>
+    <button data-side="foe" data-act="charge">聚能</button>
+    <button data-side="foe" data-act="switch">换人</button>
+    <button data-side="foe" data-act="item">道具</button>
+  </div>
+</div>
+<div class="log" id="log">折叠状态：不挡游戏</div>
+<div class="toast" id="toast"></div>
+<script>
+(function(){
+  var open = false;
+  var toggle = document.getElementById('toggle');
+  var btns = document.getElementById('btns');
+  var center = document.getElementById('center');
+  var log = document.getElementById('log');
+  var toastEl = document.getElementById('toast');
+  var timer = null;
+  function toast(msg) {
+    toastEl.textContent = msg;
+    toastEl.classList.add('on');
+    clearTimeout(timer);
+    timer = setTimeout(function(){ toastEl.classList.remove('on'); }, 1400);
+  }
+  function setOpen(on) {
+    open = on;
+    btns.style.display = on ? 'flex' : 'none';
+    center.classList.toggle('on', on);
+    toggle.textContent = on ? '收起' : '展开';
+    log.textContent = on ? '已展开：动作写在下方' : '折叠状态：不挡游戏';
+  }
+  toggle.addEventListener('click', function(){ setOpen(!open); });
+  btns.addEventListener('click', function(e){
+    var b = e.target.closest('button'); if (!b) return;
+    var side = b.getAttribute('data-side'), act = b.getAttribute('data-act');
+    if (act === 'close') { toast('关闭悬浮框（预览）'); setOpen(false); return; }
+    if (act === 'team') { toast('打开队伍 / 计算器'); return; }
+    if (act === 'scan') { toast('打开截图 / OCR'); return; }
+    if (act === 'page') { toast('打开计算器页面'); return; }
+    toast((side === 'mine' ? '我方 ' : '对手 ') + b.textContent + '（预览，不写数据）');
+  });
+  try {
+    var s = JSON.parse(localStorage.getItem('luoke.calc.v2') || 'null');
+    if (s && s.mine && s.mine.slots) {
+      var i = s.mine.active || 0;
+      document.getElementById('mineName').textContent = s.mine.slots[i] || s.mine.slots[0] || '我方';
+      var f = s.foe.active || 0;
+      document.getElementById('foeName').textContent = s.foe.slots[f] || s.foe.slots[0] || '对手';
+      document.getElementById('turn').textContent = '第 ' + ((s.history || []).length + 1) + ' 回合';
+      document.getElementById('ciTitle').textContent = '第 ' + ((s.history || []).length + 1) + ' 回合 · 信息试探';
+    }
+  } catch (e) {}
+})();
+</script>
+</body>
+</html>

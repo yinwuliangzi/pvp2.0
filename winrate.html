@@ -1,0 +1,281 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>胜率估计 · 对战助手</title>
+<link rel="stylesheet" href="duel.css">
+<style>
+.intro{font-size:12px;color:var(--mu);line-height:1.85;margin-bottom:14px}
+.intro b{color:var(--tx)}
+
+.f7{display:grid;grid-template-columns:repeat(4,1fr);gap:9px;margin-bottom:16px}
+.fc{background:var(--p);border:1px solid var(--ln);border-radius:10px;padding:10px 12px}
+.fc .i{font-size:10px;color:var(--acc);margin-bottom:3px}
+.fc .n{font-size:12.5px;font-weight:700;display:flex;align-items:baseline;gap:6px}
+.fc .n em{font-style:normal;font-size:13px;color:var(--gold);font-family:ui-monospace,monospace}
+.fc .d{font-size:10.5px;color:var(--di);margin-top:4px;line-height:1.55}
+
+table.tb{width:100%;border-collapse:separate;border-spacing:0;background:var(--p);
+  border:1px solid var(--ln);border-radius:11px;overflow:hidden;font-size:12px}
+.tb th{font-size:10.5px;color:var(--di);font-weight:500;background:#1A1F28;
+  padding:8px 10px;text-align:left;white-space:nowrap}
+.tb td{padding:8px 10px;border-top:1px solid var(--ln);vertical-align:middle}
+.tb tr:hover td{background:#1A1F28;cursor:pointer}
+.tb tr.on td{background:#1B2436}
+.sc{font-size:12px;font-weight:600}
+.sc small{display:block;font-size:10px;color:var(--di);font-weight:400}
+.spark{display:flex;align-items:center;gap:2px;min-width:70px}
+.spark i{display:block;height:14px;width:3px;border-radius:1px;background:#2A3140}
+.spark i.pos{background:var(--win)}
+.spark i.neg{background:var(--lose)}
+.pctv{font-family:ui-monospace,monospace;font-weight:700}
+.pctv.hi{color:#7DDDA8}
+.pctv.lo{color:#F0A08C}
+
+.detail{display:grid;grid-template-columns:1fr 300px;gap:14px;margin-top:14px;align-items:start}
+.bars{display:grid;gap:7px}
+.bar-row{display:grid;grid-template-columns:110px 1fr 56px;gap:9px;align-items:center;font-size:11.5px}
+.bar-row .k{color:var(--mu)}
+.bar-row .v{text-align:right;font-family:ui-monospace,monospace;color:var(--tx)}
+.bar-track{position:relative;height:9px;background:#1B202A;border-radius:99px;overflow:hidden}
+.bar-track i{position:absolute;top:0;bottom:0;border-radius:99px}
+.bar-track .zero{position:absolute;left:50%;top:-2px;bottom:-2px;width:1px;background:#39414F}
+.logit{margin-top:12px;background:#10141B;border:1px solid var(--ln);border-radius:9px;
+  padding:9px 12px;font-size:11.5px;font-family:ui-monospace,Consolas,monospace;
+  color:#9FB0FF;line-height:1.7;word-break:break-all}
+.res{display:flex;align-items:baseline;gap:8px;margin-top:10px}
+.res .big{font-size:26px;font-weight:800}
+.res .lb{font-size:11px;color:var(--di)}
+.calib .cr{display:grid;grid-template-columns:52px 1fr 52px;gap:8px;align-items:center;
+  font-size:11px;margin-bottom:6px}
+.calib .cr .m{font-family:ui-monospace,monospace;color:var(--di);text-align:right}
+.calib .tr{position:relative;height:9px;background:#1B202A;border-radius:99px}
+.calib .tr i{position:absolute;top:0;bottom:0;border-radius:99px;background:#3A5BD9}
+.calib .tr b{position:absolute;top:-3px;bottom:-3px;width:2px;background:var(--win)}
+.calib .note{font-size:10.5px;color:var(--di);margin-top:8px;line-height:1.7}
+@media(max-width:900px){.detail{grid-template-columns:1fr}.f7{grid-template-columns:repeat(2,1fr)}}
+</style>
+</head>
+<body data-page="winrate">
+<div class="wrap">
+  <div class="hd">
+    <h1>胜率估计</h1>
+    <span class="sub">特征向量 · 自对弈标定权重</span>
+  </div>
+
+  <div class="intro">
+    把当前局面压成一个 <b>7 维向量 φ</b>，胜率 <span class="mono">σ(θ·φ)</span>。
+    θ 不是手填的：用带随机性的蒙特卡洛自对弈跑数万局，再用逻辑回归把权重拟合出来。
+  </div>
+
+  <div class="sec-t"><span class="num">一</span>特征向量定义与拟合权重<span class="r">φ 每维已归一化到 [−1, 1]，正权重代表该维度越高我越有利</span></div>
+  <div class="f7" id="f7"></div>
+
+  <div class="sec-t"><span class="num">二</span>几个局面向量<span class="r">点任意一行查看该局面的贡献分解</span></div>
+  <table class="tb" id="tbl">
+    <thead><tr>
+      <th>局面</th><th>φ₁ 存活</th><th>φ₂ 血差</th><th>φ₃ 覆盖</th><th>φ₄ 速线</th>
+      <th>φ₅ 对位</th><th>φ₆ 速度</th><th>φ₇ 推演</th><th>模型胜率</th><th>模拟对照</th>
+    </tr></thead>
+    <tbody id="tbody"></tbody>
+  </table>
+
+  <div class="detail">
+    <div class="panel">
+      <div class="sec-t" id="dTitle">开局对等</div>
+      <div class="bars" id="dBars"></div>
+      <div class="logit" id="dLogit"></div>
+      <div class="res"><span class="lb">胜率</span><span class="big" id="dRate">—</span></div>
+    </div>
+    <div class="panel calib">
+      <div class="sec-t">模型校准<span class="r">横条=预测 · 绿线=实际</span></div>
+      <div id="calibBars"></div>
+      <div class="note" id="calibNote"></div>
+    </div>
+  </div>
+
+  <footer class="ft">
+    模型假设：伤害 = 1/回合数 × 浮动(0.9, 1.1)，暴击率 6.25% / 倍率 1.5，同速 50% 先手；换人只在倒下后发生，80% 概率选最优、20% 随机。<br>
+    数值为演示样例数据。
+  </footer>
+</div>
+
+<script src="core.js"></script>
+<script src="duel-data.js"></script>
+<script src="duel-nav.js"></script>
+<script>
+(function () {
+  // 有计算器数据就换掉演示数据
+  if (window.DuelData) window.DuelData.apply();
+  var Core = window.Core, D = Core.getData();
+  var NAMES = [
+    ['存活数差', '(我方存活 − 对方存活)/6', '数量本身就是资源，残局 2 打 1 的价值远高于任何单项数值'],
+    ['总血量差', '(Σ我血 − Σ敌血)/6', '血量是跨对位继承的，总血差决定「还剩多少容错」'],
+    ['对位覆盖差', '可解比例 − 被解比例', '我方有解法、对方也有解法的程度之差，衡量阵容是否成型'],
+    ['速度线优势', '2×(交叉对位我方更快占比 − 0.5)', '速度线决定谁掌握换人主动权，它的权重和血量不是同量级'],
+    ['当前回合差', '(对方击杀回合 − 我方)/3', '当前这对位正面站撸的回合差，只描述此刻，不代表全局'],
+    ['当前速度差', '(我方速度 − 对方速度)/60', '当前对位谁先手，独立于回合差解释「为什么快」'],
+    ['推演血量差', '2×(Σ我血 − Σ敌血)/2', '把上一版「对局路径」压成一个数：顺序、继承血量、针对性换人都在里面']
+  ];
+
+  var fitted = null;   // { w, loss, X, Y }
+  var scenarios = [];  // [{name, sub, state}]
+  var sel = 0;
+
+  function buildScenarios() {
+    var full = function () { return D.my.map(function () { return 1; }); };
+    var dead = function (arr, idx) { return arr.map(function (v, k) { return idx.indexOf(k) >= 0 ? 0 : v; }); };
+    var hp = function (arr, vals) { return arr.map(function (v, k) { return vals[k] == null ? v : vals[k]; }); };
+
+    scenarios = [
+      { name: '开局对等', sub: '双方满血 6v6', state: { hm: full(), hf: full(), i: 0, j: 0 } },
+      { name: '我方掉一只', sub: '5v6 均血', state: { hm: dead(full(), [2]), hf: full(), i: 0, j: 0 } },
+      { name: '对方掉两只', sub: '6v4，我方血满', state: { hm: full(), hf: dead(full(), [1, 4]), i: 0, j: 2 } },
+      { name: '残局 2v2 · 迪莫在场', sub: '迪莫35% / 雷神60% vs 雷电狮80% / 石像20%',
+        state: { hm: hp(dead(full(), [1, 2, 4, 5]), { 0: 0.35, 3: 0.6 }),
+                 hf: hp(dead(full(), [0, 1, 2, 3]), { 4: 0.8, 5: 0.2 }), i: 0, j: 4 } },
+      { name: '残局 2v2 · 血量反转', sub: '迪莫80% / 雷神60% vs 雷电狮30% / 石像20%',
+        state: { hm: hp(dead(full(), [1, 2, 4, 5]), { 0: 0.8, 3: 0.6 }),
+                 hf: hp(dead(full(), [0, 1, 2, 3]), { 4: 0.3, 5: 0.2 }), i: 0, j: 4 } },
+      { name: '被针对开局', sub: '含被克制对位的开局',
+        state: { hm: full(), hf: full(), i: 5, j: 2 } }
+    ];
+  }
+
+  function trainOnce() {
+    // 训练量大，做一次即可
+    var t = Core.train({ samples: 600, games: 70, seed: 20261111 });
+    fitted = { w: t.w, loss: t.loss, X: t.X, Y: t.Y };
+  }
+
+  function renderFeatures() {
+    var w = fitted.w;
+    var html = '';
+    NAMES.forEach(function (f, k) {
+      var val = w[k + 1];
+      html += '<div class="fc">' +
+        '<div class="i">φ' + (k + 1) + '</div>' +
+        '<div class="n">' + f[0] + '<em>' + (val >= 0 ? '+' : '') + val.toFixed(2) + '</em></div>' +
+        '<div class="d">' + f[1] + '　' + f[2] + '</div>' +
+      '</div>';
+    });
+    document.getElementById('f7').innerHTML = html;
+  }
+
+  function renderTable() {
+    var w = fitted.w;
+    var html = '';
+    scenarios.forEach(function (s, k) {
+      var phi = Core.feats(s.state, undefined);
+      var pred = Core.predict(s.state, w, undefined);
+      var sim = Core.winRate(s.state, 1200, { mods: undefined });
+      var on = k === sel ? ' on' : '';
+      html += '<tr data-k="' + k + '" class="' + on.trim() + '">' +
+        '<td><span class="sc">' + s.name + '<small>' + s.sub + '</small></span></td>';
+      phi.forEach(function (v) { html += '<td>' + spark(v) + '</td>'; });
+      html += '<td><span class="pctv ' + (pred >= 0.5 ? 'hi' : 'lo') + '">' + (pred * 100).toFixed(1) + '%</span></td>' +
+              '<td><span class="pctv">' + (sim * 100).toFixed(1) + '%</span></td></tr>';
+    });
+    document.getElementById('tbody').innerHTML = html;
+
+    Array.prototype.forEach.call(document.querySelectorAll('#tbody tr'), function (tr) {
+      tr.addEventListener('click', function () {
+        sel = Number(tr.getAttribute('data-k'));
+        renderTable(); renderDetail();
+      });
+    });
+
+    function spark(v) {
+      var n = Math.max(1, Math.min(6, Math.round(Math.abs(v) * 6)));
+      var cls = v > 0.02 ? 'pos' : (v < -0.02 ? 'neg' : '');
+      var s = '<span class="spark">';
+      for (var i = 0; i < 6; i++) s += '<i class="' + (i < n ? cls : '') + '"></i>';
+      return s + '</span>';
+    }
+  }
+
+  function renderDetail() {
+    var s = scenarios[sel], w = fitted.w;
+    var phi = Core.feats(s.state, undefined);
+    var pred = Core.predict(s.state, w, undefined);
+    var z = w[0];
+    for (var d = 0; d < phi.length; d++) z += phi[d] * w[d + 1];
+
+    document.getElementById('dTitle').textContent = s.name + ' · ' + s.sub;
+    var maxAbs = 0.01;
+    var contrib = phi.map(function (v, k) { var c = v * w[k + 1]; maxAbs = Math.max(maxAbs, Math.abs(c)); return c; });
+
+    var html = '';
+    phi.forEach(function (v, k) {
+      var c = contrib[k];
+      var wPct = Math.abs(c) / maxAbs * 50;
+      var left = c >= 0 ? 50 : 50 - wPct;
+      var color = c >= 0 ? 'var(--win)' : 'var(--lose)';
+      html += '<div class="bar-row">' +
+        '<span class="k">φ' + (k + 1) + ' ' + NAMES[k][0] + '</span>' +
+        '<span class="bar-track"><span class="zero"></span>' +
+          '<i style="left:' + left + '%;width:' + wPct + '%;background:' + color + '"></i></span>' +
+        '<span class="v">' + (c >= 0 ? '+' : '') + c.toFixed(2) + '</span>' +
+      '</div>';
+    });
+    document.getElementById('dBars').innerHTML = html;
+
+    var expr = 'σ( ' + w[0].toFixed(2);
+    phi.forEach(function (v, k) {
+      expr += (w[k + 1] >= 0 ? ' + ' : ' − ') + Math.abs(w[k + 1]).toFixed(2) + '×' + v.toFixed(2);
+    });
+    expr += ' )';
+    document.getElementById('dLogit').textContent = expr + '　= σ(' + z.toFixed(2) + ')';
+
+    var el = document.getElementById('dRate');
+    el.textContent = (pred * 100).toFixed(1) + '%';
+    el.style.color = pred >= 0.5 ? 'var(--win)' : 'var(--lose)';
+  }
+
+  function renderCalib() {
+    // 用训练集按预测概率分箱，比较预测均值与实际均值
+    var w = fitted.w, X = fitted.X, Y = fitted.Y;
+    var bins = [[0, .2], [.2, .4], [.4, .6], [.6, .8], [.8, 1]];
+    var rows = bins.map(function (b) {
+      var ps = [], ys = [];
+      for (var k = 0; k < X.length; k++) {
+        var z = w[0];
+        for (var d = 0; d < X[k].length; d++) z += X[k][d] * w[d + 1];
+        var p = Core.sig(z);
+        if (p >= b[0] && p < b[1]) { ps.push(p); ys.push(Y[k]); }
+      }
+      var pm = ps.length ? Core.sum(ps) / ps.length : 0;
+      var ym = ys.length ? Core.sum(ys) / ys.length : 0;
+      return { label: Math.round(b[0] * 100) + '-' + Math.round(b[1] * 100), p: pm, y: ym, n: ps.length };
+    });
+
+    var html = '';
+    rows.forEach(function (r) {
+      html += '<div class="cr">' +
+        '<span class="m">' + r.label + '</span>' +
+        '<span class="tr"><i style="width:' + (r.p * 100).toFixed(0) + '%"></i>' +
+          '<b style="left:' + (r.y * 100).toFixed(0) + '%"></b></span>' +
+        '<span class="m">' + (r.p * 100).toFixed(0) + '% / ' + (r.y * 100).toFixed(0) + '%</span>' +
+      '</div>';
+    });
+    document.getElementById('calibBars').innerHTML = html;
+    document.getElementById('calibNote').textContent =
+      '训练集 ' + fitted.X.length + ' 个随机局面 × 70 局模拟，对数损失 ' + fitted.loss.toFixed(3) +
+      '。越接近 0.69（随机猜测）越差，0.4 以下说明向量是有解释力的。';
+  }
+
+  // 训练可能要 1-2 秒，先渲染骨架再训练
+  document.getElementById('f7').innerHTML = '<div class="fc"><div class="d">正在拟合权重（自对弈采样中…）</div></div>';
+  setTimeout(function () {
+    trainOnce();
+    buildScenarios();
+    renderFeatures();
+    renderTable();
+    renderDetail();
+    renderCalib();
+  }, 30);
+})();
+</script>
+</body>
+</html>

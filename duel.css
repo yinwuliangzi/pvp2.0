@@ -1,0 +1,79 @@
+/* duel.css · 三个页面共用的深色主题 + 顶部按钮导航 */
+:root{
+  --bg:#0F1115; --p:#161A21; --p2:#1B202A; --ln:#262C38;
+  --tx:#D6D8DC; --mu:#8A8F98; --di:#5C636F;
+  --acc:#4D6BFE; --win:#2FBF71; --win2:#1F9E5C; --lose:#E0634A; --lose2:#B8452F;
+  --even:#5A6270; --warn:#E8A23A; --gold:#F2C36B;
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--tx)}
+body{font:13.5px/1.65 "PingFang SC","Microsoft YaHei",system-ui,sans-serif;
+     padding:0 0 60px}
+
+/* ---------- 顶部导航 ---------- */
+.duel-nav{
+  position:sticky;top:0;z-index:50;
+  display:flex;align-items:center;gap:18px;
+  padding:12px 22px;
+  background:rgba(15,17,21,.94);
+  backdrop-filter:blur(10px);
+  border-bottom:1px solid var(--ln);
+}
+.dn-brand{font-size:15px;font-weight:800;letter-spacing:.3px;white-space:nowrap}
+.dn-tabs{display:flex;gap:8px;flex-wrap:wrap}
+.dn-tab{
+  display:flex;flex-direction:column;gap:1px;
+  padding:7px 15px;border-radius:9px;
+  border:1px solid var(--ln);background:var(--p);
+  text-decoration:none;color:var(--mu);
+  transition:.15s;
+}
+.dn-tab b{font-size:13px;font-weight:700}
+.dn-tab i{font-style:normal;font-size:10.5px;color:var(--di)}
+.dn-tab:hover{border-color:#39414F;color:var(--tx)}
+.dn-tab.on{background:#1D2740;border-color:var(--acc);color:#C3CDFF}
+.dn-tab.on i{color:#8FA0E8}
+.dn-tip{margin-left:auto;font-size:11px;color:var(--di);white-space:nowrap}
+
+/* ---------- 通用容器 ---------- */
+.wrap{max-width:1240px;margin:0 auto;padding:20px 22px 0}
+.hd{display:flex;align-items:baseline;gap:10px;margin:4px 0 14px;flex-wrap:wrap}
+.hd h1{font-size:21px;margin:0;font-weight:800}
+.hd .sub{font-size:12px;color:var(--mu)}
+.panel{background:var(--p);border:1px solid var(--ln);border-radius:13px;padding:14px 16px}
+.panel + .panel{margin-top:14px}
+.sec-t{font-size:13px;font-weight:700;margin:0 0 10px;display:flex;align-items:center;gap:8px}
+.sec-t .num{color:var(--acc);font-size:11px}
+.sec-t .r{margin-left:auto;font-size:11px;font-weight:400;color:var(--di)}
+
+/* ---------- 条件条 ---------- */
+.cond{display:flex;gap:8px;align-items:center;flex-wrap:wrap;
+  background:var(--p);border:1px solid var(--ln);border-radius:11px;
+  padding:9px 13px;margin-bottom:14px}
+.cond .lb{font-size:11px;color:var(--di)}
+.cond select,.cond input{
+  font:inherit;font-size:12px;color:var(--tx);
+  background:#10141B;border:1px solid var(--ln);border-radius:7px;
+  padding:4px 8px;min-width:74px;
+}
+.cond select:focus,.cond input:focus{outline:none;border-color:var(--acc)}
+.cond .hint{margin-left:auto;font-size:11px;color:var(--di)}
+
+/* ---------- 通用小元件 ---------- */
+.chip{display:inline-flex;align-items:center;gap:5px;font-size:11px;
+  padding:2px 9px;border-radius:99px;background:#1D222C;border:1px solid var(--ln);color:var(--mu)}
+.dot{width:7px;height:7px;border-radius:50%;flex:0 0 7px}
+.tag{display:inline-block;font-size:10px;padding:1px 7px;border-radius:5px;
+  background:#232937;color:var(--mu)}
+.mono{font-family:ui-monospace,Consolas,monospace}
+footer.ft{margin-top:34px;padding-top:14px;border-top:1px solid var(--ln);
+  text-align:center;font-size:11.5px;color:#4E5560;line-height:1.9}
+.legend{display:flex;gap:14px;flex-wrap:wrap;font-size:11.5px;color:var(--mu);align-items:center}
+.legend span{display:inline-flex;align-items:center;gap:5px}
+.legend i{width:11px;height:11px;border-radius:3px;display:inline-block}
+
+@media(max-width:900px){
+  .duel-nav{flex-wrap:wrap;gap:10px}
+  .dn-tip{display:none}
+  .wrap{padding:16px 12px 0}
+}

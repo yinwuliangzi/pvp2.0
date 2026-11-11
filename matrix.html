@@ -1,0 +1,263 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>对战矩阵 · 对战助手</title>
+<link rel="stylesheet" href="duel.css">
+<style>
+.mx-grid{display:grid;gap:5px}
+.mx-row{display:grid;gap:5px;align-items:stretch}
+.mx-cell{position:relative;border-radius:9px;padding:7px 8px;cursor:pointer;
+  border:1px solid transparent;transition:.12s;min-height:56px}
+.mx-cell:hover{filter:brightness(1.18)}
+.mx-cell.sel{border-color:#F2C36B;box-shadow:0 0 0 1px #F2C36B inset}
+.mx-cell .d{font-size:14px;font-weight:800;line-height:1.15}
+.mx-cell .r{font-size:10px;color:rgba(255,255,255,.62);margin-top:2px}
+.mx-cell .a{position:absolute;right:7px;top:6px;font-size:9px;opacity:.75}
+.c-win2{background:linear-gradient(160deg,#1E5C3C,#17452E);color:#8FF0BE}
+.c-win1{background:linear-gradient(160deg,#1B4433,#163527);color:#7DDDA8}
+.c-even{background:linear-gradient(160deg,#2A2F39,#232830);color:#A9AFBB}
+.c-lose1{background:linear-gradient(160deg,#4A2A22,#3A231D);color:#F0A08C}
+.c-lose2{background:linear-gradient(160deg,#5A2A1F,#45211A);color:#F58D74}
+
+.mx-hd{display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:2px;padding:4px 2px;font-size:11px;color:var(--mu);text-align:center}
+.mx-hd .rn{font-size:11.5px;font-weight:700;color:var(--tx);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+.mx-hd .sp{font-size:10px;color:var(--di)}
+.mx-side{display:flex;flex-direction:column;justify-content:center;gap:2px;padding-right:6px}
+.mx-side .rn{font-size:12px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:68px}
+.mx-side .sp{font-size:10px;color:var(--di)}
+.mx-av{width:26px;height:26px;border-radius:7px;display:grid;place-items:center;
+  font-size:12px;font-weight:800;background:#232937;border:1px solid var(--ln);
+  color:var(--mu);flex:0 0 26px}
+
+.mx-body{display:grid;grid-template-columns:1fr 300px;gap:14px;align-items:start}
+.detail .row{display:flex;justify-content:space-between;gap:8px;
+  padding:7px 0;border-bottom:1px dashed #20262F;font-size:12.5px}
+.detail .row:last-child{border-bottom:0}
+.detail .row .k{color:var(--mu)}
+.detail .row .v{font-weight:700;text-align:right}
+.warnbox{margin-top:10px;border-left:3px solid var(--warn);background:#211A12;
+  border-radius:0 8px 8px 0;padding:9px 12px;font-size:11.5px;color:#C8B48E;line-height:1.75}
+.warnbox b{color:var(--gold)}
+
+.lead-strip{display:grid;grid-template-columns:repeat(6,1fr);gap:8px}
+.lead-card{background:#141922;border:1px solid var(--ln);border-radius:10px;padding:9px 10px}
+.lead-card.best{border-color:var(--win);background:#132019}
+.lead-card .n{font-size:12.5px;font-weight:700}
+.lead-card .v{font-size:11px;color:var(--mu);margin-top:3px}
+.lead-card.best .badge{font-size:9.5px;color:#0E1A12;background:var(--win);
+  border-radius:4px;padding:0 5px;display:inline-block;margin-bottom:4px}
+@media(max-width:900px){
+  .mx-body{grid-template-columns:1fr}
+  .lead-strip{grid-template-columns:repeat(3,1fr)}
+}
+</style>
+</head>
+<body data-page="matrix">
+<div class="wrap">
+  <div class="hd">
+    <h1>对战矩阵</h1>
+    <span class="sub">决策视图 · 击杀回合差</span>
+  </div>
+
+  <div class="cond">
+    <span class="lb">对战条件</span>
+    <label class="lb">天气</label>
+    <select id="weather"><option>无</option><option>晴</option><option>雨</option><option>雪</option></select>
+    <label class="lb">我方状态</label>
+    <select id="stM"><option>无</option><option>麻痹</option><option>烧伤</option><option>中毒</option><option>睡眠</option></select>
+    <label class="lb">对方状态</label>
+    <select id="stF"><option>无</option><option>麻痹</option><option>烧伤</option><option>中毒</option><option>睡眠</option></select>
+    <label class="lb" style="display:flex;gap:5px;align-items:center;cursor:pointer">
+      <input type="checkbox" id="useMit" checked style="width:auto;min-width:auto"> 算上防御技减伤
+    </label>
+    <span class="hint">条件变化时全部格子实时重算</span>
+  </div>
+
+  <div class="mx-body">
+    <div class="panel" style="padding:12px">
+      <div class="mx-grid" id="grid"></div>
+      <div class="legend" style="margin-top:12px">
+        <span><i style="background:#1E5C3C"></i>稳胜 +3↑</span>
+        <span><i style="background:#1B4433"></i>小优 +1~2</span>
+        <span><i style="background:#2A2F39"></i>均势 0</span>
+        <span><i style="background:#4A2A22"></i>小劣 −1~−2</span>
+        <span><i style="background:#5A2A1F"></i>崩 −3↓</span>
+        <span style="margin-left:auto;color:var(--di)">中央数字 = 对方击杀所需回合 − 我方击杀所需回合</span>
+      </div>
+    </div>
+
+    <div class="panel detail" id="detail" style="padding:14px 16px"></div>
+  </div>
+
+  <div class="panel" style="margin-top:14px">
+    <div class="sec-t">换人推荐<span class="r">对方场上：<b id="leadFoe">—</b>，按胜率排序</span></div>
+    <div class="lead-strip" id="leadStrip"></div>
+  </div>
+
+  <footer class="ft"><span id="dataSrc">数据为演示样例</span> · 计算层 core.js（无 DOM 依赖）</footer>
+</div>
+
+<script src="core.js"></script>
+<script src="duel-data.js"></script>
+<script src="duel-nav.js"></script>
+<script>
+(function () {
+  // 有计算器数据就换掉演示数据
+  if (window.DuelData) window.DuelData.apply();
+  var Core = window.Core;
+  var D = Core.getData();
+  var sel = { i: 0, j: 0 };
+
+  function mods() {
+    return {
+      weather: document.getElementById('weather').value,
+      statusM: document.getElementById('stM').value,
+      statusF: document.getElementById('stF').value
+    };
+  }
+  function initial(n) { return n ? n.slice(0, 1) : '?'; }
+  function clsName(c) {
+    return { win2:'稳胜', win1:'小优', even:'均势', lose1:'小劣', lose2:'崩' }[c] || '';
+  }
+
+  function useMit() {
+    var el = document.getElementById('useMit');
+    return !el || el.checked;
+  }
+  function applyMatrix() {
+    // 有 T0（不含减伤）且用户取消勾选时，切回 T0
+    var d = window.DuelData && window.DuelData.load();
+    if (!d || !d.T0) return;
+    var base = Core.getData();
+    if (useMit()) { base.T = d.T; } else { base.T = d.T0; }
+    Core.setData(base);
+  }
+
+  function render() {
+    applyMatrix();
+    var M = mods();
+    var cells = Core.matrixCells(M);
+    var rep = Core.leadReport(M);
+
+    // 网格：第一行 = 对方，第一列 = 我方
+    var cols = '34px repeat(' + D.foe.length + ',1fr)';
+    var html = '<div class="mx-row" style="grid-template-columns:' + cols + '">' +
+               '<div></div>';
+    D.foe.forEach(function (f) {
+      var sp = Math.round(f.spd * Core.effMods(M).spdF);
+      var hpFv = (Core.getData().hpF || [])[D.foe.indexOf(f)];
+      var hpTagF = (hpFv != null && hpFv < 0.999) ? '<span class="sp" style="color:#F2C36B">残血 ' + Math.round(hpFv * 100) + '%</span>' : '';
+      html += '<div class="mx-hd"><span class="mx-av">' + initial(f.n) + '</span>' +
+              '<span class="rn">' + f.n + '</span><span class="sp">' + f.t + ' · ' + sp + '</span>' + hpTagF + '</div>';
+    });
+    html += '</div>';
+
+    D.my.forEach(function (m, i) {
+      var sp = Math.round(m.spd * Core.effMods(M).spdM);
+      html += '<div class="mx-row" style="grid-template-columns:' + cols + '">';
+      var hpR = (Core.getData().hpM || [])[i];
+      var hpTag = (hpR != null && hpR < 0.999) ? '<span class="sp" style="color:#F2C36B">残血 ' + Math.round(hpR * 100) + '%</span>' : '';
+      html += '<div class="mx-side"><span class="mx-av" style="margin-bottom:2px">' + initial(m.n) + '</span>' +
+              '<span class="rn">' + m.n + '</span><span class="sp">' + m.t + ' · ' + sp + '</span>' + hpTag + '</div>';
+      D.foe.forEach(function (f, j) {
+        var c = cells[i][j];
+        var sign = c.diff > 0 ? '+' : '';
+        var selCls = (i === sel.i && j === sel.j) ? ' sel' : '';
+        html += '<div class="mx-cell c-' + c.cls + selCls + '" data-i="' + i + '" data-j="' + j + '">' +
+                '<div class="d">' + sign + c.diff + '</div>' +
+                '<div class="r">' + c.tm + ':' + c.tf + '</div>' +
+                '<div class="a">' + (c.fast ? '▲先手' : '▼后手') + '</div>' +
+                '</div>';
+      });
+      html += '</div>';
+    });
+    document.getElementById('grid').innerHTML = html;
+
+    // 绑定点击
+    Array.prototype.forEach.call(document.querySelectorAll('.mx-cell'), function (el) {
+      el.addEventListener('click', function () {
+        sel.i = Number(el.getAttribute('data-i'));
+        sel.j = Number(el.getAttribute('data-j'));
+        render();
+      });
+    });
+
+    renderDetail(M, cells);
+    renderLead(M, rep, cells);
+  }
+
+  function renderDetail(M, cells) {
+    var m = D.my[sel.i], f = D.foe[sel.j], c = cells[sel.i][sel.j];
+    var eff = Core.effMods(M);
+    var spM = Math.round(m.spd * eff.spdM), spF = Math.round(f.spd * eff.spdF);
+    var win = c.diff > 0 || (c.diff === 0 && spM > spF);
+    var pctM = Math.round(100 / c.tf), pctF = Math.round(100 / c.tm);
+    var myKill = c.tm, foiKill = c.tf;
+
+    document.getElementById('detail').innerHTML =
+      '<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">' +
+        '<div class="mx-av" style="width:34px;height:34px;flex:0 0 34px;font-size:15px">' + initial(m.n) + '</div>' +
+        '<div><div style="font-size:14px;font-weight:800">' + m.n + '<span style="color:var(--di);font-size:11px"> vs </span>' + f.n + '</div>' +
+        '<div style="font-size:11px;color:var(--di)">' + m.t + ' 速度 ' + spM + ' · ' + f.t + ' 速度 ' + spF + '</div></div>' +
+        '<div style="margin-left:auto" class="chip" style="color:' + (win ? 'var(--win)' : 'var(--lose)') + '">' +
+          clsName(c.cls) + ' ' + (c.diff > 0 ? '+' : '') + c.diff + '</div>' +
+      '</div>' +
+      row('出手顺序', (c.fast ? '我方先手 ▲ ' : '对方先手 ▼ ') + spM + ' vs ' + spF) +
+      row('我方击杀', myKill + ' 回合', pctF + '%~' + pctF + '% / 击') +
+      row('对方击杀', foiKill + ' 回合', pctM + '%~' + pctM + '% / 击') +
+      row('一击斩杀线', '对方血量 ≤ ' + pctF + '% 可一击带走') +
+      row('出手波动', '稳定', '无随机秒杀区间') +
+      '<div class="warnbox">' +
+        '<b>会被翻盘的条件</b>：对方携带「羽栖」类回复技能时，' + foiKill +
+        ' 回合内无法击杀即转为劣势；若对方换上速度更高的精灵，先手权反转。' +
+      '</div>' +
+      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px">' +
+        '<button class="chip" style="justify-content:center;padding:7px" id="lockBtn">锁定此对位</button>' +
+        '<button class="chip" style="justify-content:center;padding:7px" id="addBtn">加入沙盘</button>' +
+      '</div>';
+
+    function row(k, v, extra) {
+      return '<div class="row"><span class="k">' + k + '</span><span class="v">' + v +
+             (extra ? '<div style="font-size:10.5px;color:var(--di);font-weight:400">' + extra + '</div>' : '') +
+             '</span></div>';
+    }
+  }
+
+  function renderLead(M, rep, cells) {
+    document.getElementById('leadFoe').textContent = D.foe[sel.j].n;
+    var html = '';
+    // 按"对我方当前场上这只的胜负"排序
+    var order = D.my.map(function (m, k) {
+      var c = cells[k][sel.j];
+      var diff = c.diff;
+      return { k: k, diff: diff, cls: c.cls };
+    }).sort(function (a, b) { return b.diff - a.diff; });
+
+    order.forEach(function (o, idx) {
+      var m = D.my[o.k];
+      var isBest = idx === 0;
+      var sign = o.diff > 0 ? '+' : '';
+      html += '<div class="lead-card' + (isBest ? ' best' : '') + '">' +
+        (isBest ? '<div class="badge">最优</div>' : '<div style="font-size:9.5px;color:var(--di);margin-bottom:4px">NO.' + (idx + 1) + '</div>') +
+        '<div class="n">' + m.n + '</div>' +
+        '<div class="v">' + sign + o.diff + ' 回合</div>' +
+        '</div>';
+    });
+    document.getElementById('leadStrip').innerHTML = html;
+  }
+
+  var mitEl = document.getElementById('useMit');
+  if (mitEl) mitEl.addEventListener('change', render);
+  ['weather', 'stM', 'stF'].forEach(function (id) {
+    document.getElementById(id).addEventListener('change', render);
+  });
+  var ds = document.getElementById('dataSrc');
+  if (ds && window.DuelData) ds.textContent = window.DuelData.sourceLabel();
+  render();
+})();
+</script>
+</body>
+</html>

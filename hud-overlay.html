@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>悬浮 HUD</title>
+<link rel="stylesheet" href="battle-deck.css">
+<link rel="stylesheet" href="hud-overlay.css">
+</head>
+<body class="hud-only">
+<section class="hud" id="hud">
+      <header class="hud-top">
+        <b>第 1 回合</b>
+        <span>一键模式：点招式＝记录</span>
+      </header>
+      <div class="hud-names">
+        <div class="side-name"><b id="hudMineName">迪莫</b><em>光</em></div>
+        <div class="side-name foe"><em>火</em><b id="hudFoeName">焰火</b></div>
+      </div>
+      <div class="center-info" id="centerInfo">
+        <div class="ci-title" id="ciTitle">第 1 回合 · 信息试探</div>
+        <div class="ci-line" id="ciOrder">先后手：—</div>
+        <div class="ci-line" id="ciInfer">对手推测：聚能 57% ／ 暴风眼 43%</div>
+        <div class="ci-chips"><span>信息试探 1–4</span><span>能量压制 5–10</span><span>发育破局 11–16</span><span>兑现斩杀 17–24</span><span>残局收束 25–50</span></div>
+      </div>
+
+      <div class="hud-body">
+        <!-- 我方：默认 4 个动作，点「出招」后原位换成 4 个技能 -->
+        <div class="hud-col mine" id="hudMineCol">
+          <div class="hud-slots" data-mode="act">
+            <button type="button" class="slot" data-my-act="attack"><span>出招</span></button>
+            <button type="button" class="slot" data-my-act="charge"><span>聚能</span></button>
+            <button type="button" class="slot" data-my-act="switch"><span>换人</span></button>
+            <button type="button" class="slot" data-my-act="item"><span>道具</span></button>
+          </div>
+        </div>
+        <!-- 对手：同样 4 个动作位，独立于我方 -->
+        <div class="hud-col foe" id="hudFoeCol">
+          <div class="hud-slots" data-mode="act">
+            <button type="button" class="slot" data-foe-act="attack"><span>出招</span></button>
+            <button type="button" class="slot" data-foe-act="charge"><span>聚能</span></button>
+            <button type="button" class="slot" data-foe-act="switch"><span>换人</span></button>
+            <button type="button" class="slot" data-foe-act="item"><span>道具</span></button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+<div class="orbs">
+  <button type="button" class="orb" data-orb="team" title="队伍">队</button>
+  <button type="button" class="orb" data-orb="scan" title="识别">识</button>
+  <button type="button" class="orb" data-orb="close" title="关闭">关</button>
+  <button type="button" class="flip" id="flipView">页面</button>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script src="pets-data.js"></script>
+<script src="tools/pets-supplement.js"></script>
+<script src="tools/wiki-types-supplement.js"></script>
+<script src="tools/s5-supplement.js"></script>
+<script src="tools/codex-supplement.js"></script>
+<script src="types-data.js"></script>
+<script src="skills-data.js"></script>
+  <script src="tools/bwiki-skills-supplement.js"></script>
+<script src="hud-overlay.js"></script>
+</body>
+</html>

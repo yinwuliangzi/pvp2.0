@@ -3,88 +3,425 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>使用说明 · 洛克王国对战计算器</title>
+<title>使用教程 · 喵喵洛克PVP助手</title>
 <style>
-  :root { --ink:#26231f; --muted:#8b8578; --card:#fff; --bg:#f5f1e8; --line:#ece6d8; }
+  :root { --ink:#26231f; --muted:#8b8578; --card:#fff; --bg:#f5f1e8; --line:#ece6d8;
+          --blue:#3d7fd6; --gold:#c9962f; --green:#2f8a4a; --red:#c9503c; }
   * { box-sizing:border-box; }
-  body { margin:0; background:var(--bg); color:var(--ink); font:15px/1.75 "PingFang SC","Microsoft YaHei",sans-serif; }
-  .wrap { max-width:680px; margin:0 auto; padding:24px 18px 60px; }
-  h1 { font-size:22px; margin:0 0 4px; }
-  .sub { color:var(--muted); font-size:13px; margin:0 0 22px; }
-  h2 { font-size:16px; margin:26px 0 8px; padding-top:6px; border-top:1px solid var(--line); }
-  h2:first-of-type { border-top:0; }
+  body { margin:0; background:var(--bg); color:var(--ink);
+         font:15px/1.78 "PingFang SC","Microsoft YaHei",sans-serif; }
+  .wrap { max-width:760px; margin:0 auto; padding:24px 18px 70px; }
+
+  h1 { font-size:24px; margin:0 0 4px; }
+  .sub { color:var(--muted); font-size:13.5px; margin:0 0 18px; }
+  h2 { font-size:17px; margin:34px 0 10px; padding-top:10px; border-top:1px solid var(--line); }
+  h2:first-of-type { border-top:0; padding-top:0; }
+  h3 { font-size:14.5px; margin:18px 0 6px; color:#4a4438; }
   p { margin:8px 0; }
-  ul { margin:8px 0; padding-left:20px; }
-  li { margin:4px 0; }
-  code { background:#efe9dc; padding:1px 5px; border-radius:5px; font-size:13px; }
-  .card { background:var(--card); border-radius:14px; padding:14px 16px; margin:10px 0; box-shadow:0 1px 2px rgba(60,50,30,.06); }
+  ul, ol { margin:8px 0; padding-left:22px; }
+  li { margin:5px 0; }
+  code { background:#efe9dc; padding:1px 6px; border-radius:5px; font-size:13px;
+         font-family:"Consolas","Menlo",monospace; }
+  .card { background:var(--card); border-radius:14px; padding:14px 18px; margin:12px 0;
+          box-shadow:0 1px 2px rgba(60,50,30,.06); }
   .muted { color:var(--muted); font-size:13px; }
-  .warn { background:#fff6e6; border-left:3px solid #e0a33f; padding:8px 12px; border-radius:8px; font-size:13.5px; margin:10px 0; }
-  a { color:#c9503c; }
-  .top { display:flex; gap:10px; flex-wrap:wrap; margin-bottom:6px; }
-  .top a { text-decoration:none; background:#fff; padding:8px 14px; border-radius:999px; font-size:14px; }
+  .warn { background:#fff6e6; border-left:3px solid #e0a33f; padding:10px 14px;
+          border-radius:8px; font-size:13.5px; margin:12px 0; }
+  .ok { background:#effaf1; border-left:3px solid #4caf6b; padding:10px 14px;
+        border-radius:8px; font-size:13.5px; margin:12px 0; }
+  a { color:var(--red); }
+
+  .top { display:flex; gap:10px; flex-wrap:wrap; margin:14px 0 6px; }
+  .top a { text-decoration:none; background:#fff; padding:8px 14px; border-radius:999px;
+           font-size:13.5px; box-shadow:0 1px 2px rgba(60,50,30,.06); }
+
+  /* 目录 */
+  .toc { background:#fff; border-radius:14px; padding:14px 18px; margin:18px 0 8px;
+         box-shadow:0 1px 2px rgba(60,50,30,.06); }
+  .toc b { display:block; margin-bottom:8px; font-size:14px; }
+  .toc ol { margin:0; padding-left:20px; columns:2; column-gap:26px; font-size:13.5px; }
+  .toc li { margin:3px 0; break-inside:avoid; }
+  .toc a { text-decoration:none; color:#4a4438; }
+  .toc a:hover { color:var(--red); }
+
+  /* 键帽 */
+  kbd { display:inline-block; min-width:24px; padding:1px 7px; margin:0 1px;
+        border-radius:6px; background:#f0ead9; border:1px solid #d8cfb8;
+        border-bottom-width:2px; font:12.5px/1.5 "Consolas","Menlo",monospace;
+        color:#4a4438; text-align:center; }
+
+  /* 流程图 */
+  .flow { display:flex; flex-wrap:wrap; align-items:center; gap:6px; margin:10px 0; }
+  .flow span { background:#efe9dc; padding:4px 10px; border-radius:8px; font-size:13px; }
+  .flow i { color:var(--muted); font-style:normal; }
+
+  /* 表格 */
+  table { width:100%; border-collapse:collapse; margin:10px 0; font-size:13.5px; }
+  th, td { text-align:left; padding:7px 10px; border-bottom:1px solid var(--line); }
+  th { color:var(--muted); font-weight:600; font-size:12.5px; }
+  td:first-child { white-space:nowrap; }
+
+  /* 折叠 */
+  details { background:#fff; border-radius:12px; padding:10px 16px; margin:10px 0;
+            box-shadow:0 1px 2px rgba(60,50,30,.06); }
+  summary { cursor:pointer; font-weight:600; font-size:14px; }
+  details[open] summary { margin-bottom:6px; }
 </style>
 </head>
 <body>
 <div class="wrap">
-  <h1>使用说明</h1>
-  <p class="sub">这套工具解决三件事：这一下打多少、还要几发、这回合该想什么。</p>
+  <h1>使用教程</h1>
+  <p class="sub">从装好到打完一局，按顺序做一遍就会了。含手机、电脑、悬浮窗三种用法。</p>
 
+  <div class="toc">
+    <b>目录</b>
+    <ol>
+      <li><a href="#s1">选择你的用法</a></li>
+      <li><a href="#s2">第一次用：配阵容</a></li>
+      <li><a href="#s3">看懂伤害卡</a></li>
+      <li><a href="#s4">校准系数</a></li>
+      <li><a href="#s5">记录一局</a></li>
+      <li><a href="#s6">手机悬浮窗</a></li>
+      <li><a href="#s7">战报识别</a></li>
+      <li><a href="#s8">电脑版</a></li>
+      <li><a href="#s9">反向推断敌配</a></li>
+      <li><a href="#s10">存档与分享</a></li>
+      <li><a href="#s11">常见问题</a></li>
+      <li><a href="#s12">数据说明</a></li>
+      <li><a href="#s13">详细文档</a></li>
+    </ol>
+  </div>
+
+  <!-- ========== 1 ========== -->
+  <h2 id="s1">1. 选择你的用法</h2>
+  <p>同一套数据，三种打开方式，按你在哪玩选：</p>
+  <table>
+    <tr><th>场景</th><th>用哪个</th><th>特点</th></tr>
+    <tr><td>手机边打边看</td><td><b>喵喵洛克PVP助手.apk</b></td><td>悬浮在游戏上层，不切屏</td></tr>
+    <tr><td>电脑边打边看</td><td><b>电脑版 exe</b></td><td>透明置顶 + 全局快捷键</td></tr>
+    <tr><td>事后复盘 / 研究</td><td>浏览器开 <code>calculator.html</code></td><td>屏幕大，看得全</td></tr>
+  </table>
   <div class="top">
+    <a href="matrix.html">对战矩阵 →</a>
+    <a href="route.html">对局路径 →</a>
+    <a href="winrate.html">胜率估计 →</a>
     <a href="calculator.html">对战计算器 →</a>
-    <a href="fight.html">局面速算 →</a>
+    <a href="index.html">局面速算 →</a>
   </div>
 
-  <h2>两个页面分别干什么</h2>
+  <h3>两个网页分别干什么</h3>
   <div class="card">
-    <p><b>对战计算器</b>：选我方/敌方各 6 只，看每一招打多少、几发打倒；记录每回合的动作，自动推进“五段轮次”时间轴。</p>
-    <p><b>局面速算</b>：不管阵容，只填当前局面（血量、能量、先手、魔力值），马上给出“还差几次击杀 / 对手还能撑几轮 / 这轮谁先手”。</p>
+    <p><b>对战计算器</b>：配好双方 6 只，看每一招打多少、几发打倒，记录每回合动作，自动推进五段轮次时间轴。</p>
+    <p><b>局面速算</b>：不管阵容，只填当前局面（血量、能量、先手、魔力值），马上算出「还差几次击杀 / 对手还能撑几轮 / 这轮谁先手」。</p>
   </div>
 
-  <h2>第一次用，先做这一步：校准系数</h2>
-  <p>公式算出来的是“相对值”，要跟游戏里的真实伤害对一次。</p>
+  <!-- ========== 2 ========== -->
+  <h2 id="s2">2. 第一次用：先配阵容</h2>
   <ol>
-    <li>选好双方精灵、招式</li>
-    <li>游戏里打一下，记住实际伤害（比如 200）</li>
-    <li>把 200 填进「实测伤害」，点「校准」</li>
+    <li>底部有三个页签：<b>我方精灵</b> / <b>对战</b> / <b>敌方精灵</b>。先把我方 6 个槽位填上。</li>
+    <li>点空槽位打开选择器，三种筛选可叠加：
+      <ul>
+        <li><b>名字搜索</b> —— 打字直接找</li>
+        <li><b>只看 S5·新增</b> —— 只列新赛季精灵</li>
+        <li><b>按属性</b> —— 18 种属性筛选</li>
+      </ul>
+    </li>
+    <li>选中后自动带出：属性、种族值、特性、可学技能，并按属性配好 4 招。</li>
+    <li>想换招：点技能卡重选。缺副属性的精灵会提示「副属性可能缺」，可在下拉里手动指定。</li>
   </ol>
-  <p class="muted">校准一次即可，同一套数据后续都准。换了公式版本会需要重校一次。</p>
+  <div class="ok">
+    <b>省时间的小技巧</b><br>
+    · 对手阵容不确定时，先只填我方，敌方空着也能算伤害<br>
+    · 常用阵容配一次即可，页面会自动记住
+  </div>
 
-  <h2>阅读伤害卡</h2>
-  <ul>
-    <li><b>147（满血 42%）</b>：这一下打掉对方满血的 42%</li>
-    <li><b>一击 / 2 发 / 6 发</b>：还需要几发能打倒</li>
-    <li><b>本系加成 ×1.25</b>：技能属性和精灵属性相同</li>
-    <li><b>特性：威力+50%（先手）</b>：这条特性算进去了</li>
-    <li><b style="color:#b5762f">特性未计入：…</b>：这条特性现在算不了，伤害会偏少</li>
-  </ul>
+  <!-- ========== 3 ========== -->
+  <h2 id="s3">3. 看懂伤害卡</h2>
+  <p>每张技能卡上就是这一招的完整结论：</p>
+  <div class="card">
+    <p><b>147（满血 42%）</b> —— 这一下打掉对方满血的 42%</p>
+    <p><b>一击 / 2 发 / 6 发</b> —— 还需要几发能打倒</p>
+    <p><b>本系加成 ×1.25</b> —— 技能和精灵属性相同</p>
+    <p><b>✅ 可击杀</b> —— 当前血量这一下就能收</p>
+    <p><b>能量不够，要聚能</b> —— 蓝不够，这招这回合放不出来</p>
+    <p><b style="color:#b5762f">特性未计入：…</b> —— 这条特性现在算不了，实际伤害会比显示的高</p>
+  </div>
+  <div class="warn">
+    伤害按官方引擎结构算：<code>37/41</code> 常数、本系 ×1.25、属性克制、特性、印记、连击、天气。<br>
+    <b>没有随机浮动</b>，同一配置每次出同一个数。跟游戏对不上就做第 4 步校准。
+  </div>
 
-  <h2>记录回合怎么用</h2>
+  <!-- ========== 4 ========== -->
+  <h2 id="s4">4. 校准系数（只做一次）</h2>
+  <p>页面上方有个「系数」，默认 1。校准就是让它对上游戏里的真实伤害。</p>
+  <div class="flow">
+    <span>配好双方</span><i>→</i><span>游戏里打一下</span><i>→</i><span>记住实测伤害</span><i>→</i><span>填进「实测伤害」</span><i>→</i><span>点「校准」</span>
+  </div>
+  <p class="muted">例：页面算 380，游戏里实际 200，就填 200 点校准，系数会自动变成约 0.53。</p>
+
+  <!-- ========== 5 ========== -->
+  <h2 id="s5">5. 记录一局</h2>
   <ol>
-    <li>选「我方动作 / 对手动作」（出招、聚能、换人、应对、道具）</li>
-    <li>选本回合双方实际用的招式</li>
-    <li>（可选）贴一条策略标签，比如“低费混合试探”</li>
-    <li>点「记录本回合」——伤害、能量、魔力值、状态掉血会一起结算</li>
+    <li>切到「对战」页签</li>
+    <li>选<b>我方动作</b>和<b>对手动作</b>：出招 / 聚能 / 换人 / 应对 / 道具</li>
+    <li>选双方本回合实际用的招式（「选择技」会多一行分支下拉）</li>
+    <li>有倒下或对手被迫聚能，对应下拉里选一下</li>
+    <li>点 <b>记录本回合</b> —— 伤害、能量、魔力、状态掉血、天气、印记一起结算</li>
   </ol>
-  <p>顶部时间条按 50 回合走，颜色是当前所处的轮次段：信息试探 / 能量压制 / 发育破局 / 兑现斩杀 / 残局收束。</p>
+  <p>顶部时间条按 50 回合走，五段颜色：</p>
+  <div class="flow">
+    <span>信息试探 1–4</span><i>·</i><span>能量压制 5–10</span><i>·</i><span>发育破局 11–16</span><i>·</i><span>兑现斩杀 17–24</span><i>·</i><span>残局收束 25–50</span>
+  </div>
+  <p class="muted">记错了点「撤回上一回合」，或用「还原到第几回合」整个回退。</p>
 
-  <h2>整局存档</h2>
-  <p>「导出记录」会把双方配置 + 全部回合历史存成一个 json 文件；「导入记录」读回来，换台电脑也能接着复盘。</p>
+  <!-- ========== 6 ========== -->
+  <h2 id="s6">6. 手机悬浮窗</h2>
+  <h3>安装</h3>
+  <ol>
+    <li>安装 <code>喵喵洛克PVP助手.apk</code>（允许未知来源）</li>
+    <li>打开 App → 授予<b>悬浮窗权限</b>；Android 13+ 会再要通知权限（拒绝也能用）</li>
+    <li>回到游戏，底部出现操作栏即成功</li>
+  </ol>
 
-  <h2>数据从哪来</h2>
-  <ul>
-    <li>精灵 <b>550</b> 只、技能 <b>840</b> 条、可学技能表 433 只、立绘 531 张</li>
-    <li>属性/种族值/特性/血脉/进化链：官方数据文件</li>
-    <li>状态与印记：官方 buff 表（含触发时机、叠加上限、免疫）</li>
-    <li>伤害公式：官方引擎结构（37/41 常数、本系 1.25、克制、特性、印记、连击）</li>
-  </ul>
+  <h3>界面</h3>
+  <div class="card">
+    <p><b>默认状态</b>：只有屏幕底部一条操作栏，<b>游戏画面完全不被遮挡</b>。</p>
+    <p><b>操作栏</b>：<code>出招 聚能 换人 道具 | 队 识 关 页面 | 出招 聚能 换人 道具 | 状态</code></p>
+    <div class="flow">
+      <span>出招聚能换人道具</span><i>前半=我方，后半=对手</i>
+    </div>
+    <p><b>页面</b>：按一下展开完整 deck（含反推面板），再按或按「收起」还原。</p>
+    <p><b>识</b>：一键识别截图（详见第 7 节）。</p>
+    <p><b>关</b>：关闭悬浮窗。</p>
+  </div>
+
+  <h3>三种手机用法对比</h3>
+  <table>
+    <tr><th>方式</th><th>怎么开</th><th>适合</th></tr>
+    <tr><td>悬浮窗</td><td>装 APK，授权悬浮窗</td><td>边打边看（推荐）</td></tr>
+    <tr><td>全屏录入</td><td>浏览器开 <code>calculator.html?hud=1</code></td><td>大按钮，点招即记</td></tr>
+    <tr><td>系统分屏</td><td>加 <code>&amp;compact=1</code></td><td>360×500 小窗也能用</td></tr>
+  </table>
+  <div class="warn">
+    <b>iOS 没有系统级悬浮窗</b>，任何浏览器或 App 都不能盖在游戏上。<br>
+    iPhone 可以「分享 → 添加到主屏幕」做全屏 PWA；iPad 可用分屏并排。
+  </div>
+
+  <!-- ========== 7 ========== -->
+  <h2 id="s7">7. 战报识别</h2>
+  <p>游戏里打开战报弹窗 → 截图 → 点「识」，自动读出双方技能名、类型、威力、耗能。</p>
+  <div class="flow">
+    <span>打开战报</span><i>→</i><span>截图</span><i>→</i><span>点「识」</span><i>→</i><span>状态栏显示「战报 · 技能A/技能B」</span>
+  </div>
+  <div class="card">
+    <p><b>能读到什么</b></p>
+    <ul>
+      <li>技能名（含「应对！风墙」这类前缀）</li>
+      <li>类型：攻击 / 防御 / 状态</li>
+      <li>威力（如 250、420、880）</li>
+      <li>耗能</li>
+      <li>效果描述文字</li>
+    </ul>
+    <p class="muted">识别后 deck 会弹出战报卡片，并把第一个技能自动填进「敌方技能」下拉。</p>
+  </div>
+
+  <h3>普通对战截图</h3>
+  <p>不开战报直接点「识」，会读双方<b>血条百分比</b>（按 1200×540 界面比例标定），状态栏显示「血 我80%/敌36%」。</p>
+
+  <div class="warn">
+    <b>识别不准怎么办</b><br>
+    · <b>取图</b>：系统相册里最新一张截图才会被识别，截完要等 1–2 秒再点<br>
+    · <b>技能名</b>有 9KB 词表做模糊匹配，错一个字也能认出来，最可靠<br>
+    · <b>威力</b>是启发式提取，偶尔会偏。名字对了就以名字为准<br>
+    · 真机 UI 改版导致读不准时，把那张截图发出来重新标定
+  </div>
+
+  <!-- ========== 8 ========== -->
+  <h2 id="s8">8. 电脑版</h2>
+  <h3>启动</h3>
+  <p>解压 <code>喵喵洛克PVP助手-电脑版.zip</code> → 双击 <code>喵喵洛克PVP助手.exe</code>。绿色版，不用装。</p>
+
+  <h3>界面</h3>
+  <p>和手机一样：默认只有底部操作栏，透明置顶，游戏画面不被遮挡。<br>
+     鼠标只会在指到按钮/面板时被接管，其余位置点击会穿透到下面的游戏。</p>
+
+  <h3>快捷键（全局，切到游戏也生效）</h3>
+  <table>
+    <tr><th>键</th><th>功能</th></tr>
+    <tr><td><kbd>F1</kbd></td><td>显示 / 隐藏整个悬浮层</td></tr>
+    <tr><td><kbd>F2</kbd></td><td>识图</td></tr>
+    <tr><td><kbd>F3</kbd></td><td>页面 展开 / 收起</td></tr>
+    <tr><td><kbd>F4</kbd></td><td>关闭程序</td></tr>
+    <tr><td><kbd>F5</kbd></td><td>打开计算器</td></tr>
+    <tr><td><kbd>F6</kbd></td><td>快捷键说明面板</td></tr>
+    <tr><td><kbd>Q</kbd><kbd>W</kbd><kbd>E</kbd><kbd>R</kbd></td><td>我方 出招 / 聚能 / 换人 / 道具</td></tr>
+    <tr><td><kbd>U</kbd><kbd>I</kbd><kbd>O</kbd><kbd>P</kbd></td><td>对手 出招 / 聚能 / 换人 / 道具</td></tr>
+    <tr><td><kbd>Esc</kbd></td><td>收起页面</td></tr>
+  </table>
+
+  <details>
+    <summary>怎么改键</summary>
+    <p>编辑 <code>resources\app\keys.json</code>：</p>
+    <pre style="background:#f0ead9;padding:10px;border-radius:8px;overflow:auto;font-size:12.5px">{
+  "mine": { "attack": "Q", "charge": "W", "switch": "E", "item": "R" },
+  "foe":  { "attack": "U", "charge": "I", "switch": "O", "item": "P" },
+  "toggleHud": "F1", "scan": "F2", "page": "F3",
+  "close": "F4", "team": "F5", "help": "F6"
+}</pre>
+    <p class="muted">支持 <code>"Alt+Q"</code>、<code>"Ctrl+Shift+1"</code> 这类组合键。存盘后重启生效。</p>
+    <p class="muted"><b>注意</b>：单字母键是全局占用的，游戏里也用同样键位会冲突，改成带修饰键的写法。</p>
+  </details>
+
+  <h3>托盘</h3>
+  <p>右下角托盘有喵喵图标：左键 = 显示/隐藏；右键 = 菜单（页面、识图、计算器、快捷键说明、退出）。</p>
+
+  <!-- ========== 9 ========== -->
+  <h2 id="s9">9. 反向推断敌方配置</h2>
+  <p>在 deck 里展开「反向推断敌方配置」，<b>根据作战数据反推对方个体值、性格、技能威力、HP</b>。</p>
+
+  <h3>怎么填</h3>
+  <div class="flow">
+    <span>敌方 HP%</span><i>+</i><span>我方技能</span><i>+</i><span>实测伤害</span><i>+</i><span>敌方技能</span><i>+</i><span>受到的伤害</span><i>+</i><span>我方 HP%</span><i>→</i><span>反推配置</span>
+  </div>
+
+  <h3>输出什么</h3>
+  <table>
+    <tr><th>项</th><th>说明</th></tr>
+    <tr><td>我方 HP</td><td>当前 / 上限 + 百分比</td></tr>
+    <tr><td>敌方 HP</td><td>按反推个体值重算的上限 + 当前</td></tr>
+    <tr><td>六项个体值</td><td>HP / 物攻 / 魔攻 / 物防 / 魔防 / 速度</td></tr>
+    <tr><td>性格</td><td>25 种性格里误差最小的那个</td></tr>
+    <tr><td>误差</td><td>两组伤害各自的最小误差点数</td></tr>
+  </table>
+
+  <h3>原理</h3>
+  <p>按 60 级 / 5 星，遍历 <b>25 种性格 × 0~31 个体值</b>，用 <code>37/41</code> 常数 + 本系 1.25 + 属性克制<br>
+     算出预期伤害，和你填的实测伤害对比，取误差最小的组合。</p>
+
+  <div class="warn">
+    <b>这是启发式反推，不是唯一解</b><br>
+    · 一次伤害只能约束一项防御或攻击，其他个体值仍按 10 显示<br>
+    · 没算特性、印记、连击、减伤等局内修正<br>
+    · 至少填一组「技能 + 实测伤害」才有意义
+  </div>
+  <p class="muted">面板可以上下滑动，右侧金色细条是滚动条。</p>
+
+  <!-- ========== 10 ========== -->
+  <h2 id="s10">10. 存档与分享</h2>
+  <div class="card">
+    <p><b>存档本局</b> —— 同一台设备保存多局，随时切换</p>
+    <p><b>导出记录</b> —— 双方配置 + 全部回合历史存成 json</p>
+    <p><b>导出表格</b> —— 导出 Markdown 对战表，方便贴群里</p>
+    <p><b>导入记录</b> —— 读回 json，换设备也能复盘</p>
+    <p><b>分享</b> —— 生成带参数的链接，别人打开就是你这套配置</p>
+  </div>
+  <div class="warn">
+    数据存在浏览器本地（localStorage），<b>换设备或清缓存会丢</b>。重要记录请先导出。
+  </div>
+
+  <!-- ========== 11 ========== -->
+  <h2 id="s11">11. 常见问题</h2>
+
+  <details>
+    <summary>伤害比游戏里低</summary>
+    <p>先看技能卡有没有标黄「特性未计入」。没有的话做第 4 步校准。少数机制型特性确实算不了，会在卡片上提示。</p>
+  </details>
+
+  <details>
+    <summary>找不到某只精灵</summary>
+    <p>用名字搜索；新赛季的勾「只看 S5·新增」。确认查的是合并后的 665 只，不是原始数据。</p>
+  </details>
+
+  <details>
+    <summary>头像空白</summary>
+    <p>少数精灵没有立绘，会用属性色块兜底，不影响计算。</p>
+  </details>
+
+  <details>
+    <summary>悬浮窗挡住了游戏 / 点不到游戏</summary>
+    <p><b>安卓</b>：默认只显示底部一条操作栏。如果 deck 展开了，按「收起」或「页面」。<br>
+       <b>电脑</b>：按 <kbd>F1</kbd> 整个隐藏；或按 <kbd>Esc</kbd> 收起 deck。</p>
+  </details>
+
+  <details>
+    <summary>按了按钮没反应</summary>
+    <p><b>安卓</b>：先确认是不是装的最新版（重装后悬浮窗权限会重置，要重新授予）。<br>
+       <b>电脑</b>：按钮被游戏独占捕获时，用全局快捷键（<kbd>Q</kbd> <kbd>W</kbd> <kbd>E</kbd> <kbd>R</kbd> 等），快捷键不依赖窗口焦点。</p>
+  </details>
+
+  <details>
+    <summary>电脑版双击没反应</summary>
+    <p>确认解压完整（不要直接在压缩包里双击）。如果启动即退出，检查是否有杀毒软件拦截，或看启动日志里的「快捷键注册失败」提示。</p>
+  </details>
+
+  <details>
+    <summary>识图读不到图 / 读到旧图</summary>
+    <p>系统相册里<b>最新一张</b>才会被识别。截完等 1–2 秒再点「识」。</p>
+  </details>
+
+  <details>
+    <summary>手机横屏 HUD 被裁</summary>
+    <p>浏览器方式加 <code>&amp;compact=1</code>；APK 悬浮窗会自动适配。</p>
+  </details>
+
+  <details>
+    <summary>换设备数据没了</summary>
+    <p>数据在本地。先「导出记录」，新设备上「导入记录」。</p>
+  </details>
+
+  <!-- ========== 12 ========== -->
+  <h2 id="s12">12. 数据说明</h2>
+  <div class="card">
+    <p><b>当前数据量</b></p>
+    <ul>
+      <li>精灵 <b>665</b> 只</li>
+      <li>技能 <b>852</b> 条（含 bwiki 新增 21 条）</li>
+      <li>可学技能表 <b>697</b> 只</li>
+      <li>立绘 <b>737</b> 张</li>
+      <li>属性 <b>18</b> 种</li>
+    </ul>
+    <p><b>来源</b></p>
+    <ul>
+      <li>属性 / 种族值 / 特性 / 血脉 / 进化链：官方数据文件</li>
+      <li>状态与印记：官方 buff 表（含触发时机、叠加上限、免疫）</li>
+      <li>伤害公式：官方引擎结构</li>
+      <li>新精灵新技能：<a href="https://wiki.biligame.com/nrc/" target="_blank" rel="noopener">bwiki</a></li>
+    </ul>
+  </div>
 
   <div class="warn">
     <b>已知局限</b><br>
-    · 约 10 条“入场/离场/击败/每使用 N 次”类特性算不了，卡片会标黄提示<br>
-    · 双打只做了目标与群体技能口径，没有做双速先手与集火顺序<br>
-    · 进化之力没有校验“首领血脉”前置，只做提示<br>
-    · 各人数据存在自己浏览器里，不会上传，互不影响
+    · 约 10 条「入场/离场/击败/每使用 N 次」类特性算不了，卡片会标黄<br>
+    · 双打只做了目标与群体技能口径，没做双速先手与集火顺序<br>
+    · 进化之力没有校验「首领血脉」前置，只做提示<br>
+    · 反推面板是启发式，不是唯一解<br>
+    · 各人数据存在自己浏览器里，不上传，互不影响
+  </div>
+
+
+  <!-- ========== 文档中心 ========== -->
+  <h2 id="s13">13. 详细文档</h2>
+  <p>下面每份都是独立的详细说明，比本页更深：</p>
+  <div class="card">
+    <p><b><a href="tools/抓包教程.md">抓包教程</a></b><br>
+       <span class="muted">从装 Npcap 到游戏里自动记录。含依赖安装、抓 key、网卡配置、6 类排查。</span></p>
+    <p><b><a href="tools/手机浮窗说明.md">手机浮窗说明</a></b><br>
+       <span class="muted">APK 安装授权、操作栏逐项讲解、三种手机用法、品牌分屏操作、常见问题。</span></p>
+    <p><b><a href="tools/iOS说明.md">iOS 说明</a></b><br>
+       <span class="muted">为什么 iOS 没有悬浮窗、三种替代方案、不推荐的坑、已做的 PWA 适配。</span></p>
+    <p><b><a href="tools/数据说明.md">数据说明</a></b><br>
+       <span class="muted">每个数据从哪来、覆盖多少、哪些已知不完整、bwiki 新技能清单。</span></p>
+    <p><b><a href="tools/手机录入面板说明.md">手机录入面板</a></b><br>
+       <span class="muted">全屏录入 / 紧凑模式的按钮布局与操作细节。</span></p>
+  </div>
+
+  <div class="top" style="margin-top:30px">
+    <a href="index.html">局面速算 →</a>
+    <a href="calculator.html">对战计算器 →</a>
+    <a href="tools/抓包教程.md">抓包教程</a>
+    <a href="tools/手机浮窗说明.md">手机浮窗说明</a>
+    <a href="tools/iOS说明.md">iOS 说明</a>
+    <a href="tools/数据说明.md">数据说明</a>
   </div>
 
   <p class="muted" style="margin-top:26px">用着哪里不对，把当时的界面截图发出来，比描述快得多。</p>

@@ -3,6 +3,13 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#f5f1e8">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="洛克HUD">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icons/icon-180.png">
 <title>洛克王国 · 对战计算器</title>
 <link rel="stylesheet" href="calc.css">
 </head>
@@ -10,9 +17,14 @@
 <div class="app" id="app">
   <header class="topbar">
     <div class="title">对战计算器</div>
+    <button type="button" class="share-btn" id="duelGo">对战矩阵</button>
     <button type="button" class="share-btn" id="relayShow">接抓包</button>
     <button type="button" class="share-btn" id="ocrOpen">截图识别</button>
+    <button type="button" class="share-btn" id="covBtn">自检</button>
+    <a class="share-btn" href="guide.html" style="text-decoration:none">教程</a>
+    <a class="share-btn" href="tools/数据说明.md" target="_blank" rel="noreferrer" style="text-decoration:none">数据说明</a>
     <button type="button" class="share-btn" id="shareBtn">分享</button>
+    <a class="share-btn" href="battle-deck.html" style="text-decoration:none">横屏台</a>
     <div class="coef"><span>系数</span><input id="coef" type="number" step="0.001" value="1"><em class="coef-hint">× 系数 = 实测</em></div>
   </header>
 
@@ -25,9 +37,10 @@
         <div class="card-name" id="mineName"><span id="mineNameText">选择精灵</span><button type="button" class="change-btn" data-side="mine">更换</button></div>
         <div class="tags" id="mineTags"></div>
       </div>
-      <div class="line"><span class="lbl">属性</span><span id="mineEle">—</span></div>
+      <div class="line"><span class="lbl">属性</span><span id="mineEle">—</span><select id="mineEl2Sel" class="blood-sel" style="display:none;margin-left:8px;font-size:12px"></select></div>
       <div class="line"><span class="lbl">咕噜球</span><select id="mineBall" class="blood-sel"></select></div>
       <div class="line"><span class="lbl">血脉</span><select id="mineBloodSel" class="blood-sel"></select><span id="mineBlood" class="blood-note"></span><button type="button" class="mini-btn" data-blood="mine">填入招式</button></div>
+      <div class="line traitline"><span class="lbl">特性</span><textarea id="mineTrait" rows="2" placeholder="特性描述（可改）"></textarea><button type="button" class="mini-btn" id="mineTraitReset">恢复</button></div>
       <div class="moves" id="mineMoves"></div>
       <div class="line"><span class="lbl">性格</span><select id="mineNature"></select></div>
       <div class="row2">
@@ -92,6 +105,7 @@
         <label class="field"><span>我方这招</span><select id="meMoveSel"></select></label>
         <label class="field"><span>对手这招</span><select id="foeMoveSel"></select></label>
       </div>
+      <div class="act-preview" id="actPreview"></div>
       <div class="row2" style="margin-bottom:8px">
         <label class="field"><span>贴策略</span><select id="stratSel"></select></label>
       </div>
@@ -120,9 +134,11 @@
       </div>
       <div class="turn-actions" style="margin-top:6px">
         <button type="button" class="tbtn ghost" id="exportBtn">导出记录</button>
+        <button type="button" class="tbtn ghost" id="exportMdBtn">导出表格</button>
         <label class="tbtn ghost" for="importFile" style="cursor:pointer">导入记录</label>
         <input type="file" id="importFile" accept="application/json,.json" hidden>
       </div>
+      <div id="matchSummary" style="font-size:12px;color:#8b8578;margin:2px 0 6px"></div>
       <div class="history" id="historyList"></div>
     </div>
 
@@ -132,6 +148,7 @@
         <label class="field"><span>天气</span><select id="weather">
           <option value="">无</option><option value="rain">下雨（水系 +75%）</option>
           <option value="sand">沙暴（地系能耗减半）</option><option value="snow">暴风雪</option><option value="thunder">雷鸣</option>
+          <option value="dream">霞光梦境（慢的先动）</option>
         </select></label>
         <label class="field"><span>对手减伤</span><input id="cut" type="number" value="0" min="0" max="90"></label>
       </div>
@@ -251,9 +268,10 @@
         <div class="card-name" id="foeName"><span id="foeNameText">选择精灵</span><button type="button" class="change-btn" data-side="foe">更换</button></div>
         <div class="tags" id="foeTags"></div>
       </div>
-      <div class="line"><span class="lbl">属性</span><span id="foeEle">—</span></div>
+      <div class="line"><span class="lbl">属性</span><span id="foeEle">—</span><select id="foeEl2Sel" class="blood-sel" style="display:none;margin-left:8px;font-size:12px"></select></div>
       <div class="line"><span class="lbl">咕噜球</span><select id="foeBall" class="blood-sel"></select></div>
       <div class="line"><span class="lbl">血脉</span><select id="foeBloodSel" class="blood-sel"></select><span id="foeBlood" class="blood-note"></span><button type="button" class="mini-btn" data-blood="foe">填入招式</button></div>
+      <div class="line traitline"><span class="lbl">特性</span><textarea id="foeTrait" rows="2" placeholder="特性描述（可改）"></textarea><button type="button" class="mini-btn" id="foeTraitReset">恢复</button></div>
       <div class="moves" id="foeMoves"></div>
       <div class="line"><span class="lbl">性格</span><select id="foeNature"></select></div>
       <div class="row2">
@@ -305,15 +323,24 @@
 
 <script src="natures-data.js"></script>
 <script src="pets-data.js"></script>
+<script src="tools/pets-supplement.js"></script>
+<script src="tools/wiki-types-supplement.js"></script>
+<script src="tools/s5-supplement.js"></script>
+<script src="tools/codex-supplement.js"></script>
 <script src="buffs-data.js"></script>
 <script src="buff-effects.js"></script>
 <script src="learnsets-data.js"></script>
+<script src="tools/learnsets-supplement.js"></script>
 <script src="sprites-data.js"></script>
+  <script src="sprites-bundle.js" defer></script>
+<script src="tools/sprites-supplement.js"></script>
 <script src="aoe-data.js"></script>
 <script src="refract-data.js"></script>
 <script src="entry-traits-data.js"></script>
 <script src="skills-data.js"></script>
+  <script src="tools/bwiki-skills-supplement.js"></script>
 <script src="types-data.js"></script>
+<script src="native-bridge.js"></script>
 <script src="calc.js"></script>
 <div id="miniPanel" class="mini-panel" hidden>
   <div class="mini-head" id="miniDrag">
@@ -349,7 +376,7 @@
     </div>
     <p class="hint" id="relayStatus"></p>
     <pre class="relay-raw" id="relayRaw"></pre>
-    <p class="hint">浏览器直连 8765 会被跨域挡住：先运行 <code>tools/relay_cors_proxy.py</code>，再连 8766。</p>
+    <p class="hint">浏览器直连 8765 会被跨域挡住：先运行 <code>python relay_cors_proxy.py</code>，再连 8766。</p>
   </div>
 </div>
 <div id="ocrModal" class="ocr-modal" hidden>
@@ -365,5 +392,25 @@
     <div class="relay-raw" id="ocrProgress"></div>
   </div>
 </div>
+<script>
+(function () {
+  // 对战矩阵入口：把当前双方阵容导出给三个对战页面
+  var btn = document.getElementById('duelGo');
+  if (!btn) return;
+  btn.addEventListener('click', function () {
+    // 优先用完整引擎（含特性/印记/道具/天气/当前增益），不可用时退回简化版
+    var fnFull = window.__lsDuelDataFull;
+    var fnSimple = window.__lsDuelData;
+    var fn = typeof fnFull === 'function' ? fnFull : fnSimple;
+    if (typeof fn !== 'function') { alert('计算器还没加载完，稍后再点'); return; }
+    var d = null;
+    try { d = fn(); } catch (e) { d = null; }
+    if ((!d || !d.ok) && typeof fnSimple === 'function') { d = fnSimple(); }
+    if (!d || !d.ok) { alert('导出失败：' + ((d && d.why) || '未知')); return; }
+    try { localStorage.setItem('luoke.duel.data', JSON.stringify(d)); } catch (e) {}
+    location.href = 'matrix.html';
+  });
+})();
+</script>
 </body>
 </html>

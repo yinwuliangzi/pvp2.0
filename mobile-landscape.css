@@ -1,0 +1,135 @@
+/* 手机横屏对战台：16:9 舞台，三栏布局（我方 / 回合 / 对手） */
+:root {
+  --ink:#26231f; --muted:#8b8578; --line:#e9e3d6; --bg:#f5f1e8; --card:#fffdf8;
+  --mine:#3d7fd6; --foe:#c9503c; --ok:#4f9a52;
+}
+* { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+html, body { margin:0; height:100%; }
+body.ml {
+  background:#12151a; color:var(--ink); overflow:hidden;
+  font:14px/1.4 "PingFang SC","Microsoft YaHei",system-ui,sans-serif;
+  display:flex; align-items:center; justify-content:center;
+  padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+}
+
+/* 舞台：优先填满可用空间，保持横屏比例；竖屏时按宽度铺满并给出提示 */
+.ml-stage {
+  width:min(100vw, calc(100vh * 16 / 9));
+  height:min(100vh, calc(100vw * 9 / 16));
+  background:var(--bg);
+  display:grid;
+  grid-template-columns:1fr 1.15fr 1fr;
+  gap:6px;
+  padding:6px;
+  border-radius:12px;
+  overflow:hidden;
+}
+
+/* ——— 两侧面板 ——— */
+.ml-side {
+  display:flex; flex-direction:column; gap:5px; min-width:0;
+  background:var(--card); border:1px solid var(--line); border-radius:10px;
+  padding:6px 6px 6px 9px; position:relative; overflow:hidden;
+}
+.ml-side::before { content:""; position:absolute; left:0; top:0; bottom:0; width:4px; }
+.ml-mine::before { background:var(--mine); }
+.ml-foe::before { background:var(--foe); }
+
+.ml-head { display:flex; align-items:center; gap:5px; min-width:0; }
+.ml-tag { flex:0 0 auto; font-size:10px; font-weight:700; color:#fff; background:var(--mine); border-radius:4px; padding:1px 4px; }
+.ml-foe .ml-tag { background:var(--foe); }
+.ml-head b { font-size:13px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.ml-head em { font-style:normal; font-size:10px; color:var(--muted); white-space:nowrap; }
+.ml-badge { margin-left:auto; font-style:normal; font-size:10px; color:var(--muted); }
+
+.ml-vitals { display:grid; grid-template-columns:1.5fr .8fr .8fr; gap:4px; }
+.ml-vitals > div { background:#f7f3ea; border-radius:6px; padding:3px 5px; min-width:0; }
+.ml-vitals span { font-size:9.5px; color:var(--muted); display:block; }
+.ml-vitals b { font-size:12.5px; }
+.ml-hp b { color:var(--foe); }
+.ml-en b { color:var(--mine); }
+.ml-spd b { color:#8a6d1f; }
+.ml-bar { height:3px; background:#e6dfd0; border-radius:999px; overflow:hidden; margin-top:2px; }
+.ml-bar i { display:block; height:100%; width:0%; background:#7fae6f; border-radius:999px; transition:width .18s; }
+.ml-bar.foe i { background:#e0826f; }
+
+/* 技能：横屏一行两个，尽量矮 */
+.ml-moves { display:grid; grid-template-columns:1fr 1fr; gap:4px; flex:1; min-height:0; align-content:start; }
+.ml-moves button {
+  display:flex; align-items:center; gap:5px; min-height:34px; padding:0 6px;
+  border:1px solid var(--line); background:var(--card); color:var(--ink);
+  font:inherit; font-size:12px; font-weight:600; border-radius:8px; text-align:left;
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+}
+.ml-moves button::before {
+  content:attr(data-el); flex:0 0 auto; display:grid; place-items:center;
+  width:20px; height:20px; border-radius:5px; background:#f0ebe0; color:#6d6659;
+  font-size:9.5px; font-weight:700;
+}
+.ml-moves button[data-el="火"]::before { background:#fbe3dc; color:#c9503c; }
+.ml-moves button[data-el="水"]::before { background:#dfeafb; color:#3d6fd6; }
+.ml-moves button[data-el="草"]::before { background:#e0f0dd; color:#4b8a3f; }
+.ml-moves button[data-el="电"]::before { background:#fbf3d5; color:#a8871c; }
+.ml-moves button[data-el="冰"]::before { background:#e2f2f6; color:#3c8ea6; }
+.ml-moves button[data-el="翼"]::before { background:#e8f1f7; color:#4b7f9e; }
+.ml-moves button[data-el="地"]::before { background:#f0e7d5; color:#8a6d3b; }
+.ml-moves button[data-el="恶"]::before, .ml-moves button[data-el="幽"]::before { background:#e8e0ef; color:#6b4f8a; }
+.ml-moves button:disabled { opacity:.32; }
+.ml-moves button.on { border-color:#9cb894; background:#f2f7f0; }
+.ml-moves button.ml-none { grid-column:1/-1; justify-content:center; font-weight:400; color:var(--muted); }
+
+.ml-acts { display:grid; grid-template-columns:repeat(3,1fr); gap:4px; }
+.ml-acts button { border:1px solid var(--line); background:var(--card); color:var(--ink); font:inherit; font-size:12px; padding:7px 2px; border-radius:7px; }
+.ml-acts button.on { border-color:#9cb894; background:#e8f0e6; font-weight:700; }
+
+/* ——— 中间列 ——— */
+.ml-core { display:flex; flex-direction:column; gap:5px; min-width:0; }
+.ml-turn { display:flex; align-items:baseline; gap:6px; }
+.ml-turn b { font-size:15px; }
+.ml-turn span { font-size:11px; color:var(--muted); }
+.ml-timeline { position:relative; height:5px; background:#e6dfd0; border-radius:999px; overflow:hidden; }
+.ml-timeline i { display:block; height:100%; width:2%; background:linear-gradient(90deg,#9cb894,#6f9a63); border-radius:999px; }
+.ml-timeline em { position:absolute; right:0; top:7px; font-size:9px; color:var(--muted); font-style:normal; }
+
+.ml-preview {
+  flex:1; min-height:0; overflow-y:auto; background:#f7f3ea; border:1px solid var(--line);
+  border-radius:8px; padding:5px 7px; font-size:11.5px; line-height:1.45; color:#4a463f;
+}
+.ml-preview em { color:var(--muted); font-style:normal; }
+.ml-preview .ml-row { padding:2px 0; border-bottom:1px dashed rgba(0,0,0,.05); }
+.ml-preview .ml-row:last-child { border-bottom:0; }
+.ml-preview .ml-row.warn { color:#8a5a00; }
+.ml-preview .ml-row.good { color:#2f6b3a; }
+
+.ml-chips { display:flex; flex-wrap:wrap; gap:3px; max-height:46px; overflow:hidden; }
+.ml-chips span { font-size:10px; background:#efeade; border-radius:5px; padding:1px 6px; color:#5a5348; }
+.ml-chips em { font-size:10px; color:var(--muted); font-style:normal; }
+
+.ml-note { font-size:11px; color:var(--muted); min-height:15px; }
+
+.ml-foot { display:grid; grid-template-columns:1.6fr 1fr 1fr; gap:5px; }
+.ml-foot button { border:0; border-radius:9px; font:inherit; font-size:12.5px; font-weight:700; padding:11px 4px; }
+#mlRecord { background:var(--ink); color:#fff; }
+#mlUndo, #mlRepeat { background:#efeade; color:var(--ink); }
+
+/* 竖屏：宽高比不合适，压暗并提示旋转 */
+.ml-portrait-hint { display:none; }
+@media (orientation:portrait) {
+  .ml-stage { width:100vw; height:calc(100vw * 9 / 16); }
+  .ml-portrait-hint { display:block; }
+}
+
+/* 极窄横屏（如 640×360）再压一档 */
+@media (orientation:landscape) and (max-height:400px) {
+  .ml-stage { gap:4px; padding:4px; }
+  .ml-side { padding:4px 4px 4px 7px; gap:3px; }
+  .ml-moves button { min-height:30px; font-size:11.5px; }
+  .ml-acts button { padding:5px 2px; font-size:11.5px; }
+  .ml-foot button { padding:9px 4px; font-size:12px; }
+  .ml-preview { font-size:11px; }
+}
+
+/* �����������������пؼ���Ҫ�� DOM �������ʾ */
+#engineHost { position:absolute; left:-9999px; top:0; width:520px; height:2000px; overflow:hidden; opacity:0; pointer-events:none; }
+#engineHost * { font-size:14px; }
+

@@ -1,0 +1,325 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Android 截图录入 · 临时检验台</title>
+<style>
+:root { --ink:#26231f; --muted:#8b8578; --line:#e9e3d6; --bg:#f5f1e8; --card:#fffdf8; --ok:#4f9a52; --warn:#c98a1c; --bad:#c9503c; }
+* { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+body { margin:0; background:var(--bg); color:var(--ink); font:14px/1.5 "PingFang SC","Microsoft YaHei",system-ui,sans-serif; }
+.app { max-width:1080px; margin:0 auto; padding:12px 12px 60px; }
+h1 { font-size:18px; margin:6px 0 2px; }
+.sub { font-size:12px; color:var(--muted); margin:0 0 12px; }
+.card { background:var(--card); border:1px solid var(--line); border-radius:14px; padding:12px; margin-bottom:12px; }
+.card h2 { font-size:14px; margin:0 0 10px; }
+.row { display:flex; flex-wrap:wrap; gap:8px; align-items:center; }
+label.f { display:flex; align-items:center; gap:6px; font-size:12px; color:var(--muted); }
+label.f input { width:86px; border:1px solid var(--line); border-radius:8px; padding:5px 7px; font:inherit; font-size:13px; color:var(--ink); }
+button { border:0; border-radius:9px; padding:9px 14px; font:inherit; font-size:13px; font-weight:600; background:#efeade; color:var(--ink); }
+button.primary { background:var(--ink); color:#fff; }
+button.ghost { border:1px solid var(--line); background:transparent; }
+#drop { border:2px dashed var(--line); border-radius:12px; padding:18px; text-align:center; color:var(--muted); font-size:13px; }
+#drop.over { border-color:var(--ok); background:#f2f7f0; color:var(--ok); }
+.stage { position:relative; background:#111; border-radius:12px; overflow:hidden; display:flex; justify-content:center; }
+.stage canvas { display:block; max-width:100%; cursor:crosshair; }
+.meta { display:grid; grid-template-columns:repeat(auto-fill,minmax(150px,1fr)); gap:6px; margin-top:10px; }
+.meta div { background:#f7f3ea; border-radius:8px; padding:6px 8px; font-size:12px; }
+.meta em { font-style:normal; color:var(--muted); display:block; font-size:11px; }
+.meta b { font-size:13px; }
+.pill { display:inline-block; font-size:11px; border-radius:999px; padding:1px 8px; margin-left:6px; }
+.pill.ok { background:#e8f3e8; color:var(--ok); }
+.pill.warn { background:#fbf3d5; color:#8a6d1f; }
+.pill.bad { background:#fdeaea; color:var(--bad); }
+.hudbox { position:relative; background:#1b2028; border-radius:12px; overflow:hidden; }
+.hudbox canvas { display:block; width:100%; }
+pre { background:#1b2028; color:#cfe3c8; border-radius:10px; padding:10px; font-size:12px; overflow:auto; margin:0; }
+.hint { font-size:12px; color:var(--muted); }
+</style>
+</head>
+<body>
+<div class="app">
+  <h1>Android 截图录入 · 临时检验台</h1>
+  <p class="sub">
+    在浏览器里先把「截图 → 裁到游戏画面 → 坐标映射 → HUD 是否挡技能盘」跑一遍，参数对了再搬进 Kotlin。
+    全部在本地计算，图片不会上传。
+  </p>
+
+  <div class="card">
+    <h2>1. 导入截图</h2>
+    <div class="row" style="margin-bottom:10px">
+      <input id="file" type="file" accept="image/*" style="display:none">
+      <button class="primary" id="pick">选择截图文件</button>
+      <button id="paste">从剪贴板粘贴</button>
+      <button class="ghost" id="demo">用示例截图</button>
+    </div>
+    <div id="drop">把截图拖到这里，或点上面的按钮（手机可直接选图）</div>
+  </div>
+
+  <div class="card">
+    <h2>2. 屏幕与安全区（决定裁到哪里）</h2>
+    <div class="row">
+      <label class="f">屏宽 px <input id="sw" type="number" value="1920"></label>
+      <label class="f">屏高 px <input id="sh" type="number" value="1080"></label>
+      <label class="f">状态栏 px <input id="sb" type="number" value="0"></label>
+      <label class="f">导航/手势条 px <input id="nb" type="number" value="0"></label>
+      <button class="ghost" id="fromImg">用截图像素当屏幕尺寸</button>
+    </div>
+    <p class="hint" style="margin:8px 0 0">
+      截图里包含状态栏和手势条，游戏只占中间那块。填写后下面的裁剪和映射会按这个算。
+    </p>
+  </div>
+
+  <div class="card">
+    <h2>3. 游戏画面（裁切结果）</h2>
+    <div class="stage"><canvas id="cv"></canvas></div>
+    <div class="meta" id="meta"></div>
+    <p class="hint" style="margin:8px 0 0">在图上点任意位置，下方会给出该点的屏幕坐标和「720 宽 UI」坐标。</p>
+  </div>
+
+  <div class="card">
+    <h2>4. HUD 适配预览</h2>
+    <div class="row" style="margin-bottom:10px">
+      <label class="f">HUD 宽 px <input id="hw" type="number" value="560"></label>
+      <label class="f">HUD 高 px <input id="hh" type="number" value="360"></label>
+      <label class="f">底部留白 px <input id="hb" type="number" value="24"></label>
+    </div>
+    <div class="hudbox"><canvas id="hud"></canvas></div>
+  </div>
+
+  <div class="card">
+    <h2>5. 换算结果（可直接抄进 Kotlin）</h2>
+    <pre id="out">尚未导入截图</pre>
+  </div>
+</div>
+
+<script>
+(function () {
+  var $ = function (id) { return document.getElementById(id); };
+  var img = null, imgUrl = null, lastPoint = null;
+
+  function num(id, d) { var v = Number($(id).value); return Number.isFinite(v) ? v : d; }
+  function fmt(n) { return (Math.round(n * 1000) / 1000).toString(); }
+
+  function metrics() {
+    var sw = num("sw", 1080), sh = num("sh", 2400);
+    var sb = num("sb", 0), nb = num("nb", 0);
+    var iw = img ? img.width : 1080, ih = img ? img.height : 2400;
+    return {
+      sw: sw, sh: sh, sb: sb, nb: nb, iw: iw, ih: ih,
+      gameTopImg: Math.round(sb * iw / sw),
+      gameBottomImg: Math.round(ih - nb * iw / sw),
+      gameWImg: iw,
+      gameHImg: Math.round(ih - nb * iw / sw) - Math.round(sb * iw / sw),
+      scaleX: sw / iw,
+      scaleY: sh / ih
+    };
+  }
+
+  function draw() {
+    var m = metrics();
+    var cv = $("cv");
+    var ctx = cv.getContext("2d");
+    if (!img) {
+      cv.width = 720; cv.height = 405;
+      ctx.fillStyle = "#222"; ctx.fillRect(0, 0, cv.width, cv.height);
+      ctx.fillStyle = "#666"; ctx.font = "16px sans-serif"; ctx.textAlign = "center";
+      ctx.fillText("先导入一张截图", cv.width / 2, cv.height / 2);
+      $("meta").innerHTML = "";
+      $("out").textContent = "尚未导入截图";
+      return;
+    }
+    var W = m.gameWImg, H = m.gameHImg;
+    var maxW = 900, scale = Math.min(1, maxW / W);
+    cv.width = Math.round(W * scale);
+    cv.height = Math.round(H * scale);
+    ctx.drawImage(img, 0, m.gameTopImg, W, H, 0, 0, cv.width, cv.height);
+    cv._scale = scale;
+
+    if (lastPoint) {
+      var px = lastPoint.x * scale, py = lastPoint.y * scale;
+      ctx.strokeStyle = "#ffd479"; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.arc(px, py, 9, 0, Math.PI * 2); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(px - 14, py); ctx.lineTo(px + 14, py);
+      ctx.moveTo(px, py - 14); ctx.lineTo(px, py + 14); ctx.stroke();
+    }
+
+    var aspect = W / H;
+    var label = aspect < 1
+      ? "竖屏截图（正常，游戏是横屏时请横着截图）"
+      : aspect > 2.0 ? "超宽（20:9 附近）" : aspect > 1.7 ? "标准 16:9~19.5:9" : aspect > 1.4 ? "平板 4:3~16:10" : "非常规";
+    var cls = aspect > 1.7 && aspect < 2.4 ? "ok" : "warn";
+    $("meta").innerHTML = [
+      ["截图原始", m.iw + " × " + m.ih],
+      ["游戏画面", W + " × " + H + "<span class='pill " + cls + "'>" + label + "</span>"],
+      ["宽高比", fmt(aspect)],
+      ["截图→屏幕", "x " + fmt(m.scaleX) + " / y " + fmt(m.scaleY)],
+      ["裁掉顶部", m.gameTopImg + " px"],
+      ["裁掉底部", (m.ih - m.gameBottomImg) + " px"]
+    ].map(function (r) { return "<div><em>" + r[0] + "</em><b>" + r[1] + "</b></div>"; }).join("");
+
+    drawHud(W, H, aspect);
+    renderOut(m, W, H, aspect);
+  }
+
+  function drawHud(W, H, aspect) {
+    var m = metrics();
+    var hw = num("hw", 560), hh = num("hh", 360), hb = num("hb", 24);
+    var cv = $("hud");
+    var vw = 900, vh = Math.round(vw / aspect);
+    cv.width = vw; cv.height = vh;
+    var ctx = cv.getContext("2d");
+    var g = ctx.createLinearGradient(0, 0, vw, vh);
+    g.addColorStop(0, "#2e5a8a"); g.addColorStop(0.6, "#1b3a2e"); g.addColorStop(1, "#3a2a1b");
+    ctx.fillStyle = g; ctx.fillRect(0, 0, vw, vh);
+
+    // 模拟游戏技能盘（左下 4 个圆 + 右下确认）
+    ctx.fillStyle = "rgba(255,255,255,.18)";
+    for (var i = 0; i < 4; i++) {
+      ctx.beginPath();
+      ctx.arc(120 + (i % 2) * 90, vh - 120 + Math.floor(i / 2) * 90, 34, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.beginPath(); ctx.arc(vw - 120, vh - 110, 40, 0, Math.PI * 2); ctx.fill();
+
+    // HUD 框：按 px 参数换算到画布
+    var sx = vw / m.sw;
+    var boxW = hw * sx, boxH = hh * sx;
+    var x = vw - boxW - 12 * sx, y = vh - boxH - hb * sx;
+    ctx.fillStyle = "rgba(18,22,28,.45)";
+    ctx.strokeStyle = "#ffd479"; ctx.lineWidth = 2;
+    ctx.fillRect(x, y, boxW, boxH);
+    ctx.strokeRect(x, y, boxW, boxH);
+
+    var cols = 4, bw = boxW * 0.26, bh = Math.min(34 * sx, boxH / 5);
+    ctx.fillStyle = "rgba(255,255,255,.22)";
+    for (var r = 0; r < 4; r++) {
+      ctx.fillRect(x + 8 * sx, y + 10 * sx + r * (bh + 6 * sx), bw, bh);
+      ctx.fillRect(x + boxW - bw - 8 * sx, y + 10 * sx + r * (bh + 6 * sx), bw, bh);
+    }
+
+    ctx.fillStyle = "#fff"; ctx.font = "13px sans-serif";
+    ctx.fillText("HUD " + hw + "×" + hh + " px（右下留白 " + hb + " px）", x + 8 * sx, Math.max(16, y - 6));
+
+    // 判断是否压到技能盘
+    var padR = vw - 120 + 40, padB = vh - 110 + 40;
+    var hit = !(x > padR || y > padB);
+    ctx.fillStyle = hit ? "#ff8b7a" : "#9fdfa0";
+    ctx.fillText(hit ? "⚠ 和右下技能盘重叠" : "✓ 没压到技能盘", 16, 24);
+  }
+
+  function renderOut(m, W, H, aspect) {
+    var lines = [];
+    lines.push("// 抄进 Kotlin");
+    lines.push("ScreenMetrics(");
+    lines.push("    screenW = " + m.sw + ", screenH = " + m.sh + ",");
+    lines.push("    imageW  = " + m.iw + ", imageH  = " + m.ih + ",");
+    lines.push("    statusBarPx = " + m.sb + ", navBarPx = " + m.nb);
+    lines.push(")");
+    lines.push("");
+    lines.push("// 游戏画面：" + W + " × " + H + "，宽高比 " + fmt(aspect));
+    lines.push("// scaleX = " + fmt(m.scaleX) + ", scaleY = " + fmt(m.scaleY));
+    if (lastPoint) {
+      var sx = lastPoint.x * m.scaleX;
+      var sy = (lastPoint.y + m.gameTopImg) * m.scaleY;
+      var ui = Math.max(720 / W, 720 / H);
+      lines.push("");
+      lines.push("// 你在图上点的位置");
+      lines.push("// 截图坐标 (" + lastPoint.x + ", " + (lastPoint.y + m.gameTopImg) + ")");
+      lines.push("// 屏幕坐标 (" + Math.round(sx) + ", " + Math.round(sy) + ")");
+      lines.push("// 720 宽 UI 坐标 (" + Math.round(lastPoint.x * ui) + ", " + Math.round(lastPoint.y * ui) + ")");
+    }
+    $("out").textContent = lines.join("\n");
+  }
+
+  function loadImage(src) {
+    var im = new Image();
+    im.onload = function () {
+      img = im;
+      if (imgUrl) { URL.revokeObjectURL(imgUrl); }
+      $("sw").value = im.width;
+      $("sh").value = im.height;
+      draw();
+    };
+    im.src = src;
+  }
+
+  function loadFile(f) {
+    if (!f || !/^image\//.test(f.type)) return;
+    imgUrl = URL.createObjectURL(f);
+    loadImage(imgUrl);
+  }
+
+  $("pick").addEventListener("click", function () { $("file").click(); });
+  $("file").addEventListener("change", function () { loadFile(this.files && this.files[0]); });
+
+  $("drop").addEventListener("dragover", function (e) { e.preventDefault(); this.classList.add("over"); });
+  $("drop").addEventListener("dragleave", function () { this.classList.remove("over"); });
+  $("drop").addEventListener("drop", function (e) {
+    e.preventDefault(); this.classList.remove("over");
+    loadFile(e.dataTransfer.files && e.dataTransfer.files[0]);
+  });
+
+  $("paste").addEventListener("click", function () {
+    if (!navigator.clipboard || !navigator.clipboard.read) { alert("这个浏览器不支持读剪贴板，请用「选择截图文件」"); return; }
+    navigator.clipboard.read().then(function (items) {
+      for (var i = 0; i < items.length; i++) {
+        var t = items[i].types.filter(function (x) { return x.indexOf("image/") === 0; })[0];
+        if (t) { items[i].getType(t).then(function (blob) { loadFile(blob); }); return; }
+      }
+      alert("剪贴板里没有图片");
+    }).catch(function () { alert("读剪贴板被拒绝，请用「选择截图文件」"); });
+  });
+
+  $("demo").addEventListener("click", function () {
+    var c = document.createElement("canvas");
+    c.width = 1920; c.height = 1080;
+    var ctx = c.getContext("2d");
+    var g = ctx.createLinearGradient(0, 0, 1920, 1080);
+    g.addColorStop(0, "#123a5e"); g.addColorStop(0.5, "#1c4a3a"); g.addColorStop(1, "#3a2a1b");
+    ctx.fillStyle = g; ctx.fillRect(0, 0, 1920, 1080);
+    ctx.strokeStyle = "rgba(255,255,255,.35)"; ctx.lineWidth = 8;
+    ctx.strokeRect(60, 60, 1800, 960);
+    ctx.fillStyle = "rgba(255,255,255,.85)"; ctx.font = "44px sans-serif";
+    ctx.fillText("1920 × 1080 游戏画面（示例）", 120, 150);
+    // 左下技能盘
+    for (var i = 0; i < 4; i++) {
+      ctx.fillStyle = "rgba(255,255,255,.22)";
+      ctx.beginPath();
+      ctx.arc(280 + (i % 2) * 190, 760 + Math.floor(i / 2) * 170, 72, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = "rgba(255,255,255,.55)"; ctx.font = "26px sans-serif";
+      ctx.fillText(String(i + 1), 270 + (i % 2) * 190, 770 + Math.floor(i / 2) * 170);
+    }
+    // 右下确认
+    ctx.fillStyle = "rgba(255,255,255,.18)";
+    ctx.beginPath(); ctx.arc(1700, 900, 90, 0, Math.PI * 2); ctx.fill();
+    loadImage(c.toDataURL("image/png"));
+  });
+
+  ["sw", "sh", "sb", "nb", "hw", "hh", "hb"].forEach(function (id) {
+    $(id).addEventListener("input", function () { lastPoint = null; draw(); });
+  });
+
+  $("fromImg").addEventListener("click", function () {
+    if (!img) return;
+    $("sw").value = img.width; $("sh").value = img.height;
+    $("sb").value = 0; $("nb").value = 0;
+    draw();
+  });
+
+  $("cv").addEventListener("click", function (e) {
+    if (!img) return;
+    var rect = this.getBoundingClientRect();
+    var s = this._scale || 1;
+    var x = Math.round((e.clientX - rect.left) * (this.width / rect.width) / s);
+    var y = Math.round((e.clientY - rect.top) * (this.height / rect.height) / s);
+    lastPoint = { x: Math.max(0, Math.min(img.width - 1, x)), y: Math.max(0, Math.min(metrics().gameHImg - 1, y)) };
+    draw();
+  });
+
+  draw();
+})();
+</script>
+</body>
+</html>

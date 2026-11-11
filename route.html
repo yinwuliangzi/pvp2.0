@@ -1,0 +1,264 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>对局路径 · 对战助手</title>
+<link rel="stylesheet" href="duel.css">
+<style>
+.sum{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:14px}
+.sum .c{background:var(--p);border:1px solid var(--ln);border-radius:11px;padding:11px 13px}
+.sum .k{font-size:11px;color:var(--di);margin-bottom:5px}
+.sum .v{font-size:15px;font-weight:800}
+.sum .d{font-size:11px;color:var(--mu);margin-top:3px}
+
+.leadbar{display:flex;gap:6px;flex-wrap:wrap;align-items:center;
+  background:var(--p);border:1px solid var(--ln);border-radius:11px;padding:9px 13px;margin-bottom:8px}
+.leadbar .lb{font-size:11px;color:var(--di);min-width:62px}
+.lb-btn{font:inherit;font-size:11.5px;padding:3px 10px;border-radius:7px;cursor:pointer;
+  background:#10141B;border:1px solid var(--ln);color:var(--mu)}
+.lb-btn:hover{border-color:#39414F;color:var(--tx)}
+.lb-btn.on{background:#1D2740;border-color:var(--acc);color:#C3CDFF}
+.lb-btn .n{font-weight:700}
+.lb-btn .s{margin-left:5px;font-size:10px;opacity:.8}
+
+.route{display:grid;grid-template-columns:1fr 300px;gap:14px;align-items:start}
+.steps{position:relative}
+.phase{font-size:11px;color:var(--di);margin:16px 0 7px;padding-left:2px;
+  display:flex;align-items:center;gap:8px}
+.phase::after{content:'';flex:1;height:1px;background:#20262F}
+.step{position:relative;background:var(--p);border:1px solid var(--ln);
+  border-radius:11px;padding:10px 12px;margin-bottom:7px}
+.step.turn{border-color:var(--gold);background:#1A1710}
+.step.win{border-left:3px solid var(--win)}
+.step.lose{border-left:3px solid var(--lose)}
+.step .top{display:flex;align-items:center;gap:9px}
+.step .idx{width:20px;height:20px;border-radius:50%;background:#232937;border:1px solid var(--ln);
+  display:grid;place-items:center;font-size:10px;color:var(--mu);flex:0 0 20px}
+.step .who{font-size:12.5px;font-weight:700;white-space:nowrap}
+.step .tp{font-size:10px;color:var(--di)}
+.step .mid{font-size:11px;color:var(--mu);white-space:nowrap}
+.step .res{margin-left:auto;font-size:11px;font-weight:700;padding:1px 8px;border-radius:5px;white-space:nowrap}
+.step .res.w{background:rgba(47,191,113,.16);color:#7DDDA8}
+.step .res.l{background:rgba(224,99,74,.16);color:#F0A08C}
+.hpb{display:flex;align-items:center;gap:6px;margin-top:6px;font-size:10px;color:var(--di)}
+.hpb .bar{flex:1;height:5px;border-radius:99px;background:#232937;overflow:hidden}
+.hpb .bar i{display:block;height:100%;border-radius:99px}
+.hpb .v{min-width:78px;text-align:right;color:var(--mu);font-size:10px}
+.link{margin-top:6px;font-size:11px;color:var(--mu);padding-left:29px}
+.link b{color:var(--gold);font-weight:600}
+.badge-turn{font-size:9.5px;background:var(--gold);color:#1A1710;border-radius:4px;padding:0 6px;font-weight:800}
+
+.side .blk{background:var(--p);border:1px solid var(--ln);border-radius:11px;padding:11px 13px;margin-bottom:10px}
+.side .t{font-size:12px;font-weight:700;margin-bottom:8px}
+.task{display:flex;align-items:center;gap:6px;font-size:11.5px;padding:5px 0;min-width:0;
+  border-bottom:1px dashed #20262F}
+.task:last-child{border-bottom:0}
+.task .n{font-weight:600;min-width:44px;max-width:96px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.task .rl{font-size:10px;color:var(--di);white-space:nowrap;flex:0 0 auto}
+.task .st{margin-left:auto;font-size:10px;color:var(--mu);text-align:right;white-space:nowrap}
+.how{font-size:11.5px;color:var(--mu);line-height:1.85}
+.how b{color:var(--tx)}
+@media(max-width:900px){.route{grid-template-columns:1fr}.sum{grid-template-columns:repeat(2,1fr)}}
+</style>
+</head>
+<body data-page="route">
+<div class="wrap">
+  <div class="hd">
+    <h1>对局路径</h1>
+    <span class="sub">从首发到收尾 · 双方按最优应对推演</span>
+  </div>
+
+  <div class="sum" id="sum"></div>
+  <div class="leadbar"><span class="lb">我方首发</span><div id="leadM" style="display:flex;gap:6px;flex-wrap:wrap"></div></div>
+  <div class="leadbar"><span class="lb">对方首发</span><div id="leadF" style="display:flex;gap:6px;flex-wrap:wrap"></div></div>
+
+  <div class="route">
+    <div class="steps" id="steps"></div>
+    <div class="side" id="side"></div>
+  </div>
+
+  <footer class="ft"><span id="dataSrc">数据为演示样例</span> · 计算层 core.js（无 DOM 依赖）</footer>
+</div>
+
+<script src="core.js"></script>
+<script src="duel-data.js"></script>
+<script src="duel-nav.js"></script>
+<script>
+(function () {
+  // 有计算器数据就换掉演示数据
+  if (window.DuelData) window.DuelData.apply();
+  var Core = window.Core, D = Core.getData();
+  var leadM = 0, leadF = 0;
+
+  function initial(n){ return n ? n.slice(0,1) : '?'; }
+  function pct(x){ return Math.max(0, Math.round(x * 100)); }
+
+  function render() {
+    var p = Core.path(leadM, leadF);
+    renderLeadButtons(p);
+    renderSum(p);
+    renderSteps(p);
+    renderSide(p);
+  }
+
+  function renderLeadButtons(p) {
+    var rep = Core.leadReport(undefined);
+    var htmlM = '';
+    D.my.forEach(function (m, k) {
+      var o = rep.byLead[k];
+      var on = k === leadM ? ' on' : '';
+      htmlM += '<button class="lb-btn' + on + '" data-k="' + k + '">' +
+               '<span class="n">' + m.n + '</span>' +
+               '<span class="s">' + o.wins + '/' + o.total + ' 胜</span></button>';
+    });
+    var box = document.getElementById('leadM');
+    box.innerHTML = htmlM;
+    Array.prototype.forEach.call(box.querySelectorAll('.lb-btn'), function (b) {
+      b.addEventListener('click', function () { leadM = Number(b.getAttribute('data-k')); render(); });
+    });
+
+    // 对方首发：标注对当前我方首发的胜负
+    var htmlF = '';
+    D.foe.forEach(function (f, k) {
+      var q = Core.path(leadM, k);
+      var on = k === leadF ? ' on' : '';
+      htmlF += '<button class="lb-btn' + on + '" data-k="' + k + '">' +
+               '<span class="n">' + f.n + '</span>' +
+               '<span class="s">' + (q.win ? '我方胜' : '我方负') + '</span></button>';
+    });
+    var boxF = document.getElementById('leadF');
+    boxF.innerHTML = htmlF;
+    Array.prototype.forEach.call(boxF.querySelectorAll('.lb-btn'), function (b) {
+      b.addEventListener('click', function () { leadF = Number(b.getAttribute('data-k')); render(); });
+    });
+  }
+
+  function renderSum(p) {
+    var steps = p.steps;
+    var aliveM = p.hm.filter(function (h) { return h > Core.EPS; }).length;
+    var aliveF = p.hf.filter(function (h) { return h > Core.EPS; }).length;
+    var rep = Core.leadReport(undefined);
+    var bestLead = rep.best.L;
+
+    // 转折点：对方剩余血量最少的一战
+    var turnIdx = 0, best = -1;
+    steps.forEach(function (s, k) {
+      var left = 1 - s.bf;
+      if (s.win && left > best) { best = left; turnIdx = k; }
+    });
+
+    var html = '';
+    html += card('这条路径的结局', p.win ? '胜 · 我方剩 ' + aliveM + ' 只' : '负 · 对方剩 ' + aliveF + ' 只',
+                 '该首发下 ' + D.foe.length + ' 种对方开局：胜 ' + rep.byLead[leadM].wins + ' / ' + rep.byLead[leadM].total);
+    html += card('推荐首发', D.my[bestLead].n, '对方怎么开局都能赢');
+    html += card('核心威胁', D.foe[leadF].n, '由 ' + D.my[leadM].n + ' 处理');
+    var ts = steps[turnIdx];
+    html += card('转折点', '第 ' + (turnIdx + 1) + ' 战', ts
+      ? D.my[ts.i].n + ' vs ' + D.foe[ts.j].n + '：赢家仅剩 ' + pct(ts.am) + '%'
+      : '—');
+    document.getElementById('sum').innerHTML = html;
+
+    function card(k, v, d) {
+      return '<div class="c"><div class="k">' + k + '</div><div class="v">' + v + '</div>' +
+             '<div class="d">' + d + '</div></div>';
+    }
+  }
+
+  function renderSteps(p) {
+    var html = '';
+    var turnIdx = 0, best = -1;
+    p.steps.forEach(function (s, k) { var left = 1 - s.bf; if (s.win && left > best) { best = left; turnIdx = k; } });
+
+    p.steps.forEach(function (s, k) {
+      var m = D.my[s.i], f = D.foe[s.j];
+      var phase = '';
+      if (k === 0) phase = '开局 · 首发对位，决定节奏';
+      else if (k === 1) phase = '中盘 · 换人与消耗，决定谁先被打穿';
+      else if (k === p.steps.length - 1) phase = '收尾 · 算斩杀线收尾';
+      if (phase) html += '<div class="phase">' + phase + '</div>';
+
+      var isTurn = k === turnIdx;
+      html += '<div class="step ' + (s.win ? 'win' : 'lose') + (isTurn ? ' turn' : '') + '">';
+      html += '<div class="top">' +
+        '<span class="idx">' + (k + 1) + '</span>' +
+        '<span class="who">' + m.n + '</span><span class="tp">' + m.t + '</span>' +
+        '<span class="mid">' + (s.fast ? '我方先手 · ' : '对方先手 · ') + s.rounds + ' 回合</span>' +
+        (isTurn ? '<span class="badge-turn">转折点 · 险胜</span>' : '') +
+        '<span class="res ' + (s.win ? 'w' : 'l') + '">' + (s.win ? '我方胜' : '我方负') + '</span>' +
+      '</div>';
+
+      html += '<div style="display:flex;align-items:center;gap:8px;margin-top:5px">';
+      html += bar(m.n, s.bm, s.am, s.win);
+      html += '<span style="font-size:10px;color:var(--di)">—</span>';
+      html += bar(f.n, s.bf, s.af, !s.win);
+      html += '</div>';
+
+      if (s.link) {
+        html += '<div class="link">' + (s.link.side === 'foe' ? '对方 ' : '我方 ') +
+                '<b>' + s.link.out + '</b> 倒下 → 换上 <b>' + s.link.in + '</b>，' + s.link.why + '</div>';
+      }
+      html += '</div>';
+    });
+    document.getElementById('steps').innerHTML = html;
+
+    function bar(name, before, after, win) {
+      var c = win ? 'var(--win)' : 'var(--lose)';
+      return '<div style="flex:1;min-width:0">' +
+        '<div style="display:flex;justify-content:space-between;font-size:10px;color:var(--mu)">' +
+          '<span>' + name + '</span><span>' + pct(before) + '% → ' + pct(after) + '%</span></div>' +
+        '<div class="hpb" style="margin-top:3px"><div class="bar"><i style="width:' + pct(before) + '%;background:' + c + '"></i></div></div>' +
+      '</div>';
+    }
+  }
+
+  function renderSide(p) {
+    var html = '';
+
+    // 我方任务
+    html += '<div class="blk"><div class="t">我方 · 每只的任务</div>';
+    D.my.forEach(function (m, k) {
+      var kills = 0, death = null;
+      p.steps.forEach(function (s) {
+        if (s.i === k && s.win) kills++;
+        if (s.i === k && !s.win) death = D.foe[s.j].n;
+      });
+      var aliveHp = p.hm[k];
+      var role = kills >= 2 ? '主力' : (kills >= 1 ? '处理手' : '未出场');
+      html += '<div class="task"><span class="n">' + m.n + '</span>' +
+              '<span class="rl">' + role + '</span>' +
+              '<span class="st">' + (kills ? '击倒 ' + kills + ' 只' : '') +
+              (death ? ' · 倒在 ' + death : (aliveHp > Core.EPS && kills ? ' · 剩 ' + pct(aliveHp) + '%' : '')) +
+              '</span></div>';
+    });
+    html += '</div>';
+
+    // 对方威胁
+    html += '<div class="blk"><div class="t">对方 · 威胁与处理人</div>';
+    D.foe.forEach(function (f, k) {
+      var kills = 0, handler = null;
+      p.steps.forEach(function (s) {
+        if (s.j === k && !s.win) kills++;
+        if (s.j === k && s.win) handler = D.my[s.i].n;
+      });
+      html += '<div class="task"><span class="n">' + f.n + '</span>' +
+              '<span class="rl">' + (kills >= 2 ? '核心威胁' : (kills ? '击倒我 1 只' : '—')) + '</span>' +
+              '<span class="st">' + (handler ? '由 ' + handler + ' 处理' : '') + '</span></div>';
+    });
+    html += '</div>';
+
+    html += '<div class="blk"><div class="t">怎么读这条路径</div>' +
+      '<div class="how">从上往下就是整局顺序。每张卡是一次对位，虚线处是换人。<br>' +
+      '<b>黄框是转折点</b>：赢家剩血最少的一战，一次失误或速度波动就会改写结局。<br>' +
+      '换对方首发可以看其他开局路线，带 ★ 的是对你最不利的开局。</div></div>';
+
+    document.getElementById('side').innerHTML = html;
+  }
+
+  var ds = document.getElementById('dataSrc');
+  if (ds && window.DuelData) ds.textContent = window.DuelData.sourceLabel();
+  render();
+})();
+</script>
+</body>
+</html>
