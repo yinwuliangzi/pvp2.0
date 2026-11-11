@@ -12,6 +12,32 @@
 <link rel="apple-touch-icon" href="icons/icon-180.png">
 <title>洛克王国 · 对战计算器</title>
 <link rel="stylesheet" href="calc.css">
+<style>
+.duel-frame{
+  position:fixed; inset:0; z-index:9999;
+  display:flex; flex-direction:column;
+  background:#0F1115;
+}
+.duel-frame[hidden]{ display:none; }
+.df-bar{
+  display:flex; align-items:center; gap:10px;
+  padding:8px 14px; background:#161A21;
+  border-bottom:1px solid #262C38;
+  color:#D6D8DC; font:600 14px/1.4 "PingFang SC","Microsoft YaHei",system-ui,sans-serif;
+  flex:0 0 auto;
+}
+.df-bar b{ font-weight:700; }
+.df-bar button{
+  margin-left:auto; width:30px; height:30px; border-radius:8px;
+  border:1px solid #2E3646; background:#1B202A; color:#D6D8DC;
+  font-size:18px; line-height:1; cursor:pointer;
+}
+.df-bar button:hover{ background:#252C39; }
+.df-body{
+  flex:1 1 auto; width:100%; border:0; background:#0F1115; display:block;
+}
+body.df-open{ overflow:hidden; }
+</style>
 </head>
 <body>
 <div class="app" id="app">
@@ -395,10 +421,52 @@
     if ((!d || !d.ok) && typeof fnSimple === 'function') { d = fnSimple(); }
     if (!d || !d.ok) { alert('导出失败：' + ((d && d.why) || '未知')); return; }
     try { localStorage.setItem('luoke.duel.data', JSON.stringify(d)); } catch (e) {}
-    var PAGES = { matrix: 'matrix.html', route: 'route.html', winrate: 'winrate.html' };
-    location.href = PAGES[name] || 'matrix.html';
+    var PAGES = {
+      matrix:  { file: 'matrix.html',  title: '对战矩阵' },
+      route:   { file: 'route.html',   title: '对局路径' },
+      winrate: { file: 'winrate.html', title: '胜率估计' }
+    };
+    var pg = PAGES[name] || PAGES.matrix;
+    openEmbedded(pg);
   }
+
+  /** 在计算器内部打开，不跳走 */
+  function openEmbedded(pg) {
+    var wrap = document.getElementById('duelFrame');
+    var body = document.getElementById('dfBody');
+    var title = document.getElementById('dfTitle');
+    if (!wrap || !body) { location.href = pg.file; return; }
+    if (title) title.textContent = pg.title;
+    // 加时间戳避免 iframe 缓存旧数据
+    body.src = pg.file + '?embed=1&t=' + Date.now();
+    wrap.hidden = false;
+    document.body.classList.add('df-open');
+  }
+
+  function closeEmbedded() {
+    var wrap = document.getElementById('duelFrame');
+    var body = document.getElementById('dfBody');
+    if (!wrap) return;
+    wrap.hidden = true;
+    document.body.classList.remove('df-open');
+    if (body) body.src = 'about:blank';
+  }
+
+  var dfClose = document.getElementById('dfClose');
+  if (dfClose) dfClose.addEventListener('click', closeEmbedded);
+  document.addEventListener('keydown', function (ev) {
+    if (ev.key === 'Escape') closeEmbedded();
+  });
+  window.__openDuelEmbedded = openEmbedded;
+  window.__closeDuelEmbedded = closeEmbedded;
 })();
 </script>
+<div id="duelFrame" class="duel-frame" hidden>
+  <div class="df-bar">
+    <b id="dfTitle">对战矩阵</b>
+    <button type="button" id="dfClose" title="关闭">×</button>
+  </div>
+  <iframe id="dfBody" class="df-body" src="about:blank"></iframe>
+</div>
 </body>
 </html>

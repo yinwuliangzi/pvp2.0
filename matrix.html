@@ -138,6 +138,7 @@
 
   function render() {
     applyMatrix();
+    D = Core.getData();   // 计算器数据可能已更新
     var M = mods();
     var cells = Core.matrixCells(M);
     var rep = Core.leadReport(M);
@@ -257,6 +258,11 @@
   var ds = document.getElementById('dataSrc');
   if (ds && window.DuelData) ds.textContent = window.DuelData.sourceLabel();
   render();
+  // 计算器数据变了就自动重绘
+  window.__duelRefresh = render;
+  if (window.DuelData && window.DuelData.listen) {
+    window.DuelData.listen(function () { render(); });
+  }
 })();
 </script>
 </body>

@@ -124,6 +124,7 @@ table.tb{width:100%;border-collapse:separate;border-spacing:0;background:var(--p
   var sel = 0;
 
   function buildScenarios() {
+    D = Core.getData();   // 计算器数据可能已更新
     var full = function () { return D.my.map(function () { return 1; }); };
     var dead = function (arr, idx) { return arr.map(function (v, k) { return idx.indexOf(k) >= 0 ? 0 : v; }); };
     var hp = function (arr, vals) { return arr.map(function (v, k) { return vals[k] == null ? v : vals[k]; }); };
@@ -275,6 +276,17 @@ table.tb{width:100%;border-collapse:separate;border-spacing:0;background:var(--p
     renderDetail();
     renderCalib();
   }, 30);
+
+  // 计算器数据变了：重算局面和表格，但保留已拟合的权重（训练很贵）
+  window.__duelRefresh = function () {
+    if (!fitted) return;
+    buildScenarios();
+    renderTable();
+    renderDetail();
+  };
+  if (window.DuelData && window.DuelData.listen) {
+    window.DuelData.listen(function () { if (window.__duelRefresh) window.__duelRefresh(); });
+  }
 })();
 </script>
 </body>

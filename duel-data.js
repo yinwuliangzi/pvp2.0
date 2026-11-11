@@ -64,8 +64,42 @@
     return '计算器数据' + (mode ? '（' + mode + '）' : '') + ' · 我方 ' + d.my.length + ' 只 / 对方 ' + d.foe.length + ' 只' + (when ? ' · ' + when : '');
   }
 
+  /* ---------- 4. 监听计算器的数据变化 ---------- */
+  var _bc = null;
+  function channel() {
+    if (_bc !== null) return _bc;
+    try { _bc = new BroadcastChannel("luoke-duel"); } catch (e) { _bc = false; }
+    return _bc;
+  }
+
+  function listen(cb) {
+    var lastAt = 0;
+    function fire(at) {
+      if (at && at <= lastAt) return;
+      lastAt = at || Date.now();
+      try { cb(); } catch (e) {}
+    }
+    var ch = channel();
+    if (ch) {
+      ch.onmessage = function (ev) {
+        if (!ev.data || ev.data.type !== "duel-data") return;
+        apply();
+        fire(ev.data.at);
+      };
+    }
+    // 同源其它窗口改了 localStorage 时（iframe / 另开标签）
+    window.addEventListener("storage", function (ev) {
+      if (ev.key !== KEY || !ev.newValue) return;
+      var d2 = null;
+      try { d2 = JSON.parse(ev.newValue); } catch (e) { return; }
+      apply();
+      fire(d2 && d2.at);
+    });
+  }
+
   window.DuelData = {
     KEY: KEY,
+    listen: listen,
     load: load,
     save: save,
     clear: clear,

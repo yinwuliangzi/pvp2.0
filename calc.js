@@ -1955,6 +1955,7 @@
   }
 
   function renderAll() {
+    scheduleDuelSync();
     if (window.__syncWeather) window.__syncWeather();
     ["mine", "foe"].forEach(function (side) {
       renderSlots(side); renderStats(side); renderCard(side); buildMoves(side);
@@ -6996,6 +6997,35 @@
       return { ok: false, why: String(e && e.message || e) };
     }
   };
+
+  /* ---- 自动同步：计算器一改，三个对战页面跟着变 ---- */
+  var _duelTimer = null;
+  var _duelBc = null;
+  function duelChannel() {
+    if (_duelBc !== null) return _duelBc;
+    try { _duelBc = new BroadcastChannel("luoke-duel"); } catch (e) { _duelBc = false; }
+    return _duelBc;
+  }
+  function scheduleDuelSync() {
+    if (_duelTimer) clearTimeout(_duelTimer);
+    _duelTimer = setTimeout(function () {
+      _duelTimer = null;
+      try { syncDuelData(); } catch (e) {}
+    }, 600);
+  }
+  function syncDuelData() {
+    var fn = window.__lsDuelDataFull || window.__lsDuelData;
+    if (typeof fn !== "function") return;
+    var d = null;
+    try { d = fn(); } catch (e) { return; }
+    if (!d || !d.ok) return;
+    d.at = Date.now();
+    try { localStorage.setItem("luoke.duel.data", JSON.stringify(d)); } catch (e) {}
+    var ch = duelChannel();
+    if (ch) { try { ch.postMessage({ type: "duel-data", at: d.at }); } catch (e) {} }
+  }
+  window.__syncDuelData = syncDuelData;
+  window.__scheduleDuelSync = scheduleDuelSync;
 
   window.__lsDuelData = function () {
     try {

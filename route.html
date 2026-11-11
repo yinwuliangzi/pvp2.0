@@ -95,6 +95,7 @@
   function pct(x){ return Math.max(0, Math.round(x * 100)); }
 
   function render() {
+    D = Core.getData();   // 计算器数据可能已更新
     var p = Core.path(leadM, leadF);
     renderLeadButtons(p);
     renderSum(p);
@@ -258,6 +259,11 @@
   var ds = document.getElementById('dataSrc');
   if (ds && window.DuelData) ds.textContent = window.DuelData.sourceLabel();
   render();
+  // 计算器数据变了就自动重绘
+  window.__duelRefresh = render;
+  if (window.DuelData && window.DuelData.listen) {
+    window.DuelData.listen(function () { render(); });
+  }
 })();
 </script>
 </body>
