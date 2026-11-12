@@ -233,8 +233,8 @@
       row('出手顺序', (c.fast ? '我方先手 ▲ ' : '对方先手 ▼ ') + spM + ' vs ' + spF) +
       row('我方击杀', myKill + ' 回合', pctF + '%~' + pctF + '% / 击') +
       row('对方击杀', foiKill + ' 回合', pctM + '%~' + pctM + '% / 击') +
-      row('一击斩杀线', '对方血量 ≤ ' + oneShot + '% 可一击带走',
-          oneShot >= 100 ? '已能一击击杀' : ('差 ' + (100 - oneShot) + '%')) +
+      row('一击斩杀线', '对方血量 ≤ ' + oneShotPct() + '% 可一击带走',
+          oneShotPct() >= 100 ? '已能一击击杀' : ('差 ' + (100 - oneShotPct()) + '%')) +
       row('出手波动',
           spM === spF ? '同速' : (c.fast ? '我方稳定先手' : '对方稳定先手'),
           spM === spF ? '同速时随机先后手' : ('速度差 ' + Math.abs(spM - spF))) +
@@ -267,8 +267,10 @@
       });
     }, 0);
 
-    // 一击斩杀线：我方每回合伤害占对方满血的比例
-    var oneShot = myKill > 0 ? Math.min(100, Math.round(100 / myKill)) : 0;
+    // 一击斩杀线：我方每回合伤害占对方满血的比例（用函数，避免 var 提升导致 undefined）
+    function oneShotPct() {
+      return myKill > 0 ? Math.min(100, Math.round(100 / myKill)) : 0;
+    }
 
     /** 翻盘条件：按真实回合差与速度生成，不再写死 */
     function flipText() {
@@ -286,8 +288,8 @@
       if (!c.fast && d <= 1) {
         parts.push('对方速度 ' + spF + ' 压过我方 ' + spM + '，先手权在对方手上');
       }
-      if (oneShot < 100) {
-        parts.push('一击只能打掉 ' + oneShot + '%，需要 ' + myKill + ' 回合');
+      if (oneShotPct() < 100) {
+        parts.push('一击只能打掉 ' + oneShotPct() + '%，需要 ' + myKill + ' 回合');
       }
       if (myKill >= 4) {
         parts.push('战斗会拖长，对手有更多回复/换人机会');
