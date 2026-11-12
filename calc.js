@@ -207,10 +207,42 @@
   window.__spriteFallback = spriteFallback;
 
   /** 立绘地址：中文文件名在 Android file:// 下必须编码，否则破图 */
+  // 安卓 WebView 对中文文件名兼容差：把 webp 读成 dataURL 再显示
+  var _spriteCache = {};
+  var _isAndroid = /Android/i.test(navigator.userAgent || "");
   function spriteSrc(n) {
     var p = spriteFallback(n);
     if (!p) return "";
     if (String(p).indexOf("data:") === 0) return p;
+    if (_isAndroid) {
+      if (_spriteCache[n]) return _spriteCache[n];
+      _spriteCache[n] = p;               // 先用原路径占位
+      (function (key, path) {
+        try {
+          var xhr = new XMLHttpRequest();
+          xhr.open("GET", encodeURI(path), true);
+          xhr.responseType = "blob";
+          xhr.onload = function () {
+            if (xhr.status !== 200 && xhr.status !== 0) return;
+            try {
+              var fr = new FileReader();
+              fr.onload = function () {
+                _spriteCache[key] = fr.result;   // dataURL
+                // 立即替换页面上所有用到它的 img
+                var list = document.querySelectorAll("img");
+                for (var i = 0; i < list.length; i++) {
+                  var cur = list[i].getAttribute("src") || "";
+                  if (cur === encodeURI(path) || cur === fr.result) list[i].src = fr.result;
+                }
+              };
+              fr.readAsDataURL(xhr.response);
+            } catch (e) {}
+          };
+          xhr.send();
+        } catch (e) {}
+      })(n, p);
+      return p;
+    }
     try { return encodeURI(p); } catch (e) { return p; }
   }
   window.__spriteSrc = spriteSrc;
