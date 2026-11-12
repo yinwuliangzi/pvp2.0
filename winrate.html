@@ -145,7 +145,39 @@ table.tb{width:100%;border-collapse:separate;border-spacing:0;background:var(--p
   ];
 
   var fitted = null;   // { w, loss, X, Y }
-  var scenarios = [];  // [{name, sub, state}]
+  var // 用真实阵容生成局面：名字、血量比例都跟当前计算器一致
+    var nm = function (arr, k) { return (arr[k] && arr[k].n) || ('第' + (k + 1) + '只'); };
+    var pick2 = function (arr) { return [0, Math.min(3, arr.length - 1)]; };
+    var pickFoe2 = function (arr) { return [Math.min(4, arr.length - 1), arr.length - 1]; };
+    var m2 = pick2(D.my), f2 = pickFoe2(D.foe);
+    var deadM = [], deadF = [];
+    for (var a = 0; a < D.my.length; a++) if (m2.indexOf(a) < 0) deadM.push(a);
+    for (var b = 0; b < D.foe.length; b++) if (f2.indexOf(b) < 0) deadF.push(b);
+
+    var labelSide = function (arr, idxs, vals) {
+      return idxs.map(function (k) { return nm(arr, k) + Math.round((vals[k] || 1) * 100) + '%'; }).join(' / ');
+    };
+
+    scenarios = [
+      { name: '开局对等', sub: '双方满血 ' + D.my.length + 'v' + D.foe.length,
+        state: { hm: full(), hf: full(), i: 0, j: 0 } },
+      { name: '我方掉一只', sub: (D.my.length - 1) + 'v' + D.foe.length + '，掉的是 ' + nm(D.my, 2),
+        state: { hm: dead(full(), [2]), hf: full(), i: 0, j: 0 } },
+      { name: '对方掉两只', sub: '我方血满，对方少 ' + nm(D.foe, 1) + '、' + nm(D.foe, 4),
+        state: { hm: full(), hf: dead(full(), [1, 4]), i: 0, j: 2 } },
+      { name: '残局 2v2 · ' + nm(D.my, m2[0]) + '在场',
+        sub: labelSide(D.my, m2, { [m2[0]]: 0.35, [m2[1]]: 0.6 }) + ' vs ' +
+             labelSide(D.foe, f2, { [f2[0]]: 0.8, [f2[1]]: 0.2 }),
+        state: { hm: hp(dead(full(), deadM), { [m2[0]]: 0.35, [m2[1]]: 0.6 }),
+                 hf: hp(dead(full(), deadF), { [f2[0]]: 0.8, [f2[1]]: 0.2 }), i: m2[0], j: f2[0] } },
+      { name: '残局 2v2 · 血量反转',
+        sub: labelSide(D.my, m2, { [m2[0]]: 0.8, [m2[1]]: 0.6 }) + ' vs ' +
+             labelSide(D.foe, f2, { [f2[0]]: 0.3, [f2[1]]: 0.2 }),
+        state: { hm: hp(dead(full(), deadM), { [m2[0]]: 0.8, [m2[1]]: 0.6 }),
+                 hf: hp(dead(full(), deadF), { [f2[0]]: 0.3, [f2[1]]: 0.2 }), i: m2[0], j: f2[0] } },
+      { name: '被针对开局', sub: '从最不利的首发开始（' + nm(D.my, D.my.length - 1) + ' 对 ' + nm(D.foe, 2) + '）',
+        state: { hm: full(), hf: full(), i: D.my.length - 1, j: 2 } }
+    ];  // [{name, sub, state}]
   var sel = 0;
 
   function buildScenarios() {
