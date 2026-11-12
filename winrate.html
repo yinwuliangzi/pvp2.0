@@ -145,59 +145,53 @@ table.tb{width:100%;border-collapse:separate;border-spacing:0;background:var(--p
   ];
 
   var fitted = null;   // { w, loss, X, Y }
-  var // 用真实阵容生成局面：名字、血量比例都跟当前计算器一致
-    var nm = function (arr, k) { return (arr[k] && arr[k].n) || ('第' + (k + 1) + '只'); };
-    var pick2 = function (arr) { return [0, Math.min(3, arr.length - 1)]; };
-    var pickFoe2 = function (arr) { return [Math.min(4, arr.length - 1), arr.length - 1]; };
-    var m2 = pick2(D.my), f2 = pickFoe2(D.foe);
-    var deadM = [], deadF = [];
-    for (var a = 0; a < D.my.length; a++) if (m2.indexOf(a) < 0) deadM.push(a);
-    for (var b = 0; b < D.foe.length; b++) if (f2.indexOf(b) < 0) deadF.push(b);
+  var scenarios = [];  // [{name, sub, state}]
+  var sel = 0;
 
-    var labelSide = function (arr, idxs, vals) {
-      return idxs.map(function (k) { return nm(arr, k) + Math.round((vals[k] || 1) * 100) + '%'; }).join(' / ');
+  function buildScenarios() {
+    D = Core.getData();   // 计算器数据可能已更新
+
+    var nm = function (arr, k) { return (arr[k] && arr[k].n) || ('第' + (k + 1) + '只'); };
+    var full = function () { return D.my.map(function () { return 1; }); };
+    var dead = function (arr, idx) { return arr.map(function (v, k) { return idx.indexOf(k) >= 0 ? 0 : v; }); };
+    var hp = function (arr, vals) { return arr.map(function (v, k) { return vals[k] == null ? v : vals[k]; }); };
+
+    // 用当前阵容里真实的精灵来构造残局
+    var A = 0, B = Math.min(3, D.my.length - 1);
+    var FA = Math.min(4, D.foe.length - 1), FB = D.foe.length - 1;
+    var deadM = [], deadF = [], k;
+    for (k = 0; k < D.my.length; k++) if (k !== A && k !== B) deadM.push(k);
+    for (k = 0; k < D.foe.length; k++) if (k !== FA && k !== FB) deadF.push(k);
+
+    var hmA = {}, hmB = {}, hfA = {}, hfB = {};
+    hmA[A] = 0.35; hmA[B] = 0.6;  hfA[FA] = 0.8;  hfA[FB] = 0.2;
+    hmB[A] = 0.8;  hmB[B] = 0.6;  hfB[FA] = 0.3;  hfB[FB] = 0.2;
+
+    var lab = function (arr, i1, v1, i2, v2) {
+      return nm(arr, i1) + Math.round(v1 * 100) + '% / ' + nm(arr, i2) + Math.round(v2 * 100) + '%';
     };
 
     scenarios = [
       { name: '开局对等', sub: '双方满血 ' + D.my.length + 'v' + D.foe.length,
         state: { hm: full(), hf: full(), i: 0, j: 0 } },
-      { name: '我方掉一只', sub: (D.my.length - 1) + 'v' + D.foe.length + '，掉的是 ' + nm(D.my, 2),
+
+      { name: '我方掉一只', sub: nm(D.my, 2) + ' 已倒下，' + (D.my.length - 1) + 'v' + D.foe.length,
         state: { hm: dead(full(), [2]), hf: full(), i: 0, j: 0 } },
-      { name: '对方掉两只', sub: '我方血满，对方少 ' + nm(D.foe, 1) + '、' + nm(D.foe, 4),
+
+      { name: '对方掉两只', sub: nm(D.foe, 1) + '、' + nm(D.foe, 4) + ' 已倒下',
         state: { hm: full(), hf: dead(full(), [1, 4]), i: 0, j: 2 } },
-      { name: '残局 2v2 · ' + nm(D.my, m2[0]) + '在场',
-        sub: labelSide(D.my, m2, { [m2[0]]: 0.35, [m2[1]]: 0.6 }) + ' vs ' +
-             labelSide(D.foe, f2, { [f2[0]]: 0.8, [f2[1]]: 0.2 }),
-        state: { hm: hp(dead(full(), deadM), { [m2[0]]: 0.35, [m2[1]]: 0.6 }),
-                 hf: hp(dead(full(), deadF), { [f2[0]]: 0.8, [f2[1]]: 0.2 }), i: m2[0], j: f2[0] } },
+
+      { name: '残局 2v2 · ' + nm(D.my, A) + '在场',
+        sub: lab(D.my, A, 0.35, B, 0.6) + ' vs ' + lab(D.foe, FA, 0.8, FB, 0.2),
+        state: { hm: hp(dead(full(), deadM), hmA), hf: hp(dead(full(), deadF), hfA), i: A, j: FA } },
+
       { name: '残局 2v2 · 血量反转',
-        sub: labelSide(D.my, m2, { [m2[0]]: 0.8, [m2[1]]: 0.6 }) + ' vs ' +
-             labelSide(D.foe, f2, { [f2[0]]: 0.3, [f2[1]]: 0.2 }),
-        state: { hm: hp(dead(full(), deadM), { [m2[0]]: 0.8, [m2[1]]: 0.6 }),
-                 hf: hp(dead(full(), deadF), { [f2[0]]: 0.3, [f2[1]]: 0.2 }), i: m2[0], j: f2[0] } },
-      { name: '被针对开局', sub: '从最不利的首发开始（' + nm(D.my, D.my.length - 1) + ' 对 ' + nm(D.foe, 2) + '）',
+        sub: lab(D.my, A, 0.8, B, 0.6) + ' vs ' + lab(D.foe, FA, 0.3, FB, 0.2),
+        state: { hm: hp(dead(full(), deadM), hmB), hf: hp(dead(full(), deadF), hfB), i: A, j: FA } },
+
+      { name: '被针对开局',
+        sub: '从 ' + nm(D.my, D.my.length - 1) + ' 对 ' + nm(D.foe, 2) + ' 开始',
         state: { hm: full(), hf: full(), i: D.my.length - 1, j: 2 } }
-    ];  // [{name, sub, state}]
-  var sel = 0;
-
-  function buildScenarios() {
-    D = Core.getData();   // 计算器数据可能已更新
-    var full = function () { return D.my.map(function () { return 1; }); };
-    var dead = function (arr, idx) { return arr.map(function (v, k) { return idx.indexOf(k) >= 0 ? 0 : v; }); };
-    var hp = function (arr, vals) { return arr.map(function (v, k) { return vals[k] == null ? v : vals[k]; }); };
-
-    scenarios = [
-      { name: '开局对等', sub: '双方满血 6v6', state: { hm: full(), hf: full(), i: 0, j: 0 } },
-      { name: '我方掉一只', sub: '5v6 均血', state: { hm: dead(full(), [2]), hf: full(), i: 0, j: 0 } },
-      { name: '对方掉两只', sub: '6v4，我方血满', state: { hm: full(), hf: dead(full(), [1, 4]), i: 0, j: 2 } },
-      { name: '残局 2v2 · 迪莫在场', sub: '迪莫35% / 雷神60% vs 雷电狮80% / 石像20%',
-        state: { hm: hp(dead(full(), [1, 2, 4, 5]), { 0: 0.35, 3: 0.6 }),
-                 hf: hp(dead(full(), [0, 1, 2, 3]), { 4: 0.8, 5: 0.2 }), i: 0, j: 4 } },
-      { name: '残局 2v2 · 血量反转', sub: '迪莫80% / 雷神60% vs 雷电狮30% / 石像20%',
-        state: { hm: hp(dead(full(), [1, 2, 4, 5]), { 0: 0.8, 3: 0.6 }),
-                 hf: hp(dead(full(), [0, 1, 2, 3]), { 4: 0.3, 5: 0.2 }), i: 0, j: 4 } },
-      { name: '被针对开局', sub: '含被克制对位的开局',
-        state: { hm: full(), hf: full(), i: 5, j: 2 } }
     ];
   }
 
