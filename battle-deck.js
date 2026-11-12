@@ -673,6 +673,9 @@
           var base = String(pet.n).replace(/[（(][^）)]*[）)]/g, "").trim();
           src = (window.SPRITES && window.SPRITES[base]) || "";
         }
+        if (src && String(src).indexOf("data:") !== 0) {
+          try { src = encodeURI(src); } catch (e) {}
+        }
         if (src) {
           img.onload = function () { img.classList.add("loaded"); if (fb) fb.style.display = "none"; };
           img.onerror = function () { img.classList.remove("loaded"); if (fb) fb.style.display = ""; };

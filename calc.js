@@ -189,6 +189,31 @@
   var TYPES = window.TYPES || {};
   var $ = function (id) { return document.getElementById(id); };
   var byName = function (n) { return PETS.filter(function (p) { return p.n === n; })[0] || null; };
+  /** 变体名兜底：去掉括号后用主形态；主形态也没有，就用任意同前缀形态 */
+  function spriteFallback(name) {
+    if (!name) return "";
+    var S = window.SPRITES || {};
+    if (S[name]) return S[name];
+    var base = String(name).replace(/[（(][^）)]*[）)]/g, "").trim();
+    if (base && S[base]) return S[base];
+    if (base) {
+      var keys = Object.keys(S);
+      for (var i = 0; i < keys.length; i++) {
+        if (keys[i].indexOf(base + "（") === 0 || keys[i].indexOf(base + "(") === 0) return S[keys[i]];
+      }
+    }
+    return "";
+  }
+  window.__spriteFallback = spriteFallback;
+
+  /** 立绘地址：中文文件名在 Android file:// 下必须编码，否则破图 */
+  function spriteSrc(n) {
+    var p = spriteFallback(n);
+    if (!p) return "";
+    if (String(p).indexOf("data:") === 0) return p;
+    try { return encodeURI(p); } catch (e) { return p; }
+  }
+  window.__spriteSrc = spriteSrc;
   var byId = function (id) { return SKILLS.filter(function (s) { return s.id === Number(id); })[0] || null; };
 
   // 数据里没有的技能：允许手填威力/属性/分类（bwiki 也查不到的先占位）
@@ -723,7 +748,7 @@
       var pct = Math.max(0, Math.min(100, Math.round(Number(curHp) / Math.max(1, Number(bst.max)) * 100)));
       if (pet) b.title = pet.n + "｜" + (pet.t || "") + "｜" + (role ? role.label + "：" + role.desc : "") +
         "｜血量 " + curHp + "/" + bst.max + "（" + pct + "%）｜能量 " + (i === state[side].active ? state[side].energy : bst.energy);
-      var img = pet && window.SPRITES && window.SPRITES[pet.n] ? "<img class='slot-img' src='" + window.SPRITES[pet.n] + "' alt='' loading='lazy'>" : "";
+      var img = pet && window.SPRITES && window.SPRITES[pet.n] ? "<img class='slot-img' src='" + spriteSrc(pet.n) + "' alt='' loading='lazy'>" : "";
       b.innerHTML = (role ? "<em class='slot-role " + role.cls + "'>" + role.label + "</em>" : "") +
         img + "<span>" + (name || "空") + "</span>" + (pet ? "<i class='dot' style='background:" + elColor(pet.el) + "'></i>" : "") +
         "<i class='slot-bar'><b style='width:" + pct + "%'></b></i>";
@@ -5612,7 +5637,7 @@
     var list = all.slice(0, PICKER_LIMIT);
     var more = all.length - list.length;
     $("pickerList").innerHTML = list.map(function (x) {
-      var sp = window.SPRITES && window.SPRITES[x.n];
+      var sp = typeof spriteSrc === "function" ? spriteSrc(x.n) : (window.SPRITES && window.SPRITES[x.n]);
       return "<button type='button' class='picker-item' data-pick='" + x.n + "'>" +
         (sp ? "<img class='picker-thumb' src='" + sp + "' alt='' loading='lazy'>" : "<i class='picker-thumb' style='background:" + elColor(x.el) + ";border-radius:8px;opacity:.25'></i>") +
         "<span>" + x.n + "</span>" +
