@@ -53,6 +53,10 @@
   .mx-body{grid-template-columns:1fr}
   .lead-strip{grid-template-columns:repeat(3,1fr)}
 }
+
+.lead-card[data-lead]{ cursor:pointer; transition:.12s }
+.lead-card[data-lead]:hover{ border-color:#4D6BFE; }
+.lead-card[data-lead]:active{ transform:scale(.98) }
 </style>
 </head>
 <body data-page="matrix">
@@ -192,6 +196,7 @@
 
   function renderDetail(M, cells) {
     var m = D.my[sel.i], f = D.foe[sel.j], c = cells[sel.i][sel.j];
+    var m2 = m, f2 = f;
     var eff = Core.effMods(M);
     var spM = Math.round(m.spd * eff.spdM), spF = Math.round(f.spd * eff.spdF);
     var win = c.diff > 0 || (c.diff === 0 && spM > spF);
@@ -220,6 +225,24 @@
         '<button class="chip" style="justify-content:center;padding:7px" id="addBtn">加入沙盘</button>' +
       '</div>';
 
+    setTimeout(function () {
+      var lb = document.getElementById('lockBtn');
+      var ab = document.getElementById('addBtn');
+      if (lb) lb.addEventListener('click', function () {
+        lb.textContent = '已锁定 ' + m2.n + ' vs ' + f2.n;
+        lb.style.borderColor = '#2FBF71';
+        lb.style.color = '#7DDDA8';
+      });
+      if (ab) ab.addEventListener('click', function () {
+        try {
+          var saved = JSON.parse(localStorage.getItem('luoke.sandbox') || '[]');
+          saved.push({ mine: m2.n, foe: f2.n, diff: c.diff, at: Date.now() });
+          localStorage.setItem('luoke.sandbox', JSON.stringify(saved.slice(-20)));
+          ab.textContent = '已加入（共 ' + Math.min(saved.length, 20) + ' 条）';
+        } catch (e) { ab.textContent = '加入失败'; }
+      });
+    }, 0);
+
     function row(k, v, extra) {
       return '<div class="row"><span class="k">' + k + '</span><span class="v">' + v +
              (extra ? '<div style="font-size:10.5px;color:var(--di);font-weight:400">' + extra + '</div>' : '') +
@@ -237,17 +260,37 @@
       return { k: k, diff: diff, cls: c.cls };
     }).sort(function (a, b) { return b.diff - a.diff; });
 
+    var allSame = order.length > 1 && order.every(function (o) { return o.diff === order[0].diff; });
     order.forEach(function (o, idx) {
       var m = D.my[o.k];
-      var isBest = idx === 0;
+      var isBest = idx === 0 && !allSame;
       var sign = o.diff > 0 ? '+' : '';
-      html += '<div class="lead-card' + (isBest ? ' best' : '') + '">' +
-        (isBest ? '<div class="badge">最优</div>' : '<div style="font-size:9.5px;color:var(--di);margin-bottom:4px">NO.' + (idx + 1) + '</div>') +
+      var clsName = ({ win2: '稳胜', win1: '小优', even: '均势', lose1: '小劣', lose2: '崩' })[o.cls] || '';
+      html += '<div class="lead-card' + (isBest ? ' best' : '') + '" data-lead="' + o.k + '" role="button" tabindex="0">' +
+        (isBest ? '<div class="badge">最优</div>'
+                : '<div style="font-size:9.5px;color:var(--di);margin-bottom:4px">NO.' + (idx + 1) + '</div>') +
         '<div class="n">' + m.n + '</div>' +
         '<div class="v">' + sign + o.diff + ' 回合</div>' +
+        '<div class="v" style="font-size:10px;color:var(--di);margin-top:2px">' + clsName + '</div>' +
         '</div>';
     });
-    document.getElementById('leadStrip').innerHTML = html;
+    // 全部相同就提示一句，避免误以为排序有意义
+    if (allSame) {
+      html = '<div style="grid-column:1/-1;font-size:11.5px;color:var(--warn);margin-bottom:2px">' +
+             '这 6 只对 ' + D.foe[sel.j].n + ' 的结果完全一样（都是 ' + (order[0].diff > 0 ? '+' : '') + order[0].diff +
+             ' 回合），换谁都差不多</div>' + html;
+    }
+    var strip = document.getElementById('leadStrip');
+    strip.innerHTML = html;
+    // 点推荐卡 = 选中该行（矩阵里高亮这一行）
+    Array.prototype.forEach.call(strip.querySelectorAll('.lead-card[data-lead]'), function (el) {
+      el.addEventListener('click', function () {
+        sel.i = Number(el.getAttribute('data-lead'));
+        render();
+        var row = document.querySelectorAll('.mx-row')[sel.i + 1];
+        if (row && row.scrollIntoView) row.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+      });
+    });
   }
 
   var mitEl = document.getElementById('useMit');

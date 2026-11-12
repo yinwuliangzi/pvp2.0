@@ -886,6 +886,7 @@
     if (title) title.textContent = TITLES[name] || name;
     body.src = file + '?embed=1&t=' + Date.now();
     wrap.hidden = false;
+    try { if (window.__pcForceInteractive) window.__pcForceInteractive(true); } catch (e) {}
   }
 
   function hideEmbedded() {
@@ -894,6 +895,7 @@
     if (!wrap) return;
     wrap.hidden = true;
     if (body) body.src = 'about:blank';
+    try { if (window.__pcForceInteractive) window.__pcForceInteractive(false); } catch (e) {}
   }
 
   document.addEventListener('click', function (ev) {
@@ -909,6 +911,7 @@
       var on = false;
       try {
         if (window.__pcTogglePredict) on = window.__pcTogglePredict();
+      try { if (window.__pcForceInteractive) window.__pcForceInteractive(!!on); } catch (e) {}
       } catch (e) {}
       pb.classList.toggle('on', !!on);
     });

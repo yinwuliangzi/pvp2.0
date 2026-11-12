@@ -21,10 +21,12 @@ table.tb{width:100%;border-collapse:separate;border-spacing:0;background:var(--p
 .tb th{font-size:10.5px;color:var(--di);font-weight:500;background:#1A1F28;
   padding:8px 10px;text-align:left;white-space:nowrap}
 .tb td{padding:8px 10px;border-top:1px solid var(--ln);vertical-align:middle}
+.tb td:first-child{min-width:150px}
+.tb th:first-child{min-width:150px}
 .tb tr:hover td{background:#1A1F28;cursor:pointer}
 .tb tr.on td{background:#1B2436}
-.sc{font-size:12px;font-weight:600}
-.sc small{display:block;font-size:10px;color:var(--di);font-weight:400}
+.sc{font-size:12px;font-weight:600;white-space:nowrap}
+.sc small{display:block;font-size:10px;color:var(--di);font-weight:400;white-space:normal;line-height:1.5}
 .spark{display:flex;align-items:center;gap:2px;min-width:70px}
 .spark i{display:block;height:14px;width:3px;border-radius:1px;background:#2A3140}
 .spark i.pos{background:var(--win)}
@@ -55,6 +57,8 @@ table.tb{width:100%;border-collapse:separate;border-spacing:0;background:var(--p
 .calib .tr b{position:absolute;top:-3px;bottom:-3px;width:2px;background:var(--win)}
 .calib .note{font-size:10.5px;color:var(--di);margin-top:8px;line-height:1.7}
 @media(max-width:900px){.detail{grid-template-columns:1fr}.f7{grid-template-columns:repeat(2,1fr)}}
+.tb-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch}
+.tb-scroll .tb{min-width:860px}
 </style>
 </head>
 <body data-page="winrate">
@@ -73,6 +77,7 @@ table.tb{width:100%;border-collapse:separate;border-spacing:0;background:var(--p
   <div class="f7" id="f7"></div>
 
   <div class="sec-t"><span class="num">二</span>几个局面向量<span class="r">点任意一行查看该局面的贡献分解</span></div>
+  <div class="tb-scroll">
   <table class="tb" id="tbl">
     <thead><tr>
       <th>局面</th><th>φ₁ 存活</th><th>φ₂ 血差</th><th>φ₃ 覆盖</th><th>φ₄ 速线</th>
@@ -80,6 +85,7 @@ table.tb{width:100%;border-collapse:separate;border-spacing:0;background:var(--p
     </tr></thead>
     <tbody id="tbody"></tbody>
   </table>
+  </div>
 
   <div class="detail">
     <div class="panel">
