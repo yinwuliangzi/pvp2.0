@@ -887,6 +887,7 @@
     body.src = file + '?embed=1&t=' + Date.now();
     wrap.hidden = false;
     try { if (window.__pcForceInteractive) window.__pcForceInteractive(true); } catch (e) {}
+    try { if (window.AndroidHud && window.AndroidHud.setOpaque) window.AndroidHud.setOpaque(true); } catch (e) {}
   }
 
   function hideEmbedded() {
@@ -896,6 +897,7 @@
     wrap.hidden = true;
     if (body) body.src = 'about:blank';
     try { if (window.__pcForceInteractive) window.__pcForceInteractive(false); } catch (e) {}
+    try { if (window.AndroidHud && window.AndroidHud.setOpaque) window.AndroidHud.setOpaque(false); } catch (e) {}
   }
 
   document.addEventListener('click', function (ev) {
@@ -942,8 +944,8 @@
 (function () {
   var wrap = document.getElementById('fullBattle');
   if (!wrap) return;
-  // 保留三栏紧凑界面，不启用 iframe
-  wrap.hidden = true;
+  // 彻底移除，避免与内嵌页面叠层导致透明/点不到
+  try { wrap.parentNode && wrap.parentNode.removeChild(wrap); } catch (e) { wrap.hidden = true; }
   document.body.classList.remove('fb-on');
 })();
 
