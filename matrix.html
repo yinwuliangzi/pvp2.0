@@ -214,12 +214,12 @@
       row('出手顺序', (c.fast ? '我方先手 ▲ ' : '对方先手 ▼ ') + spM + ' vs ' + spF) +
       row('我方击杀', myKill + ' 回合', pctF + '%~' + pctF + '% / 击') +
       row('对方击杀', foiKill + ' 回合', pctM + '%~' + pctM + '% / 击') +
-      row('一击斩杀线', '对方血量 ≤ ' + pctF + '% 可一击带走') +
-      row('出手波动', '稳定', '无随机秒杀区间') +
-      '<div class="warnbox">' +
-        '<b>会被翻盘的条件</b>：对方携带「羽栖」类回复技能时，' + foiKill +
-        ' 回合内无法击杀即转为劣势；若对方换上速度更高的精灵，先手权反转。' +
-      '</div>' +
+      row('一击斩杀线', '对方血量 ≤ ' + oneShot + '% 可一击带走',
+          oneShot >= 100 ? '已能一击击杀' : ('差 ' + (100 - oneShot) + '%')) +
+      row('出手波动',
+          spM === spF ? '同速' : (c.fast ? '我方稳定先手' : '对方稳定先手'),
+          spM === spF ? '同速时随机先后手' : ('速度差 ' + Math.abs(spM - spF))) +
+      '<div class="warnbox">' + flipText() + '</div>' +
       '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px">' +
         '<button class="chip" style="justify-content:center;padding:7px" id="lockBtn">锁定此对位</button>' +
         '<button class="chip" style="justify-content:center;padding:7px" id="addBtn">加入沙盘</button>' +
@@ -242,6 +242,34 @@
         } catch (e) { ab.textContent = '加入失败'; }
       });
     }, 0);
+
+    // 一击斩杀线：我方每回合伤害占对方满血的比例
+    var oneShot = myKill > 0 ? Math.min(100, Math.round(100 / myKill)) : 0;
+
+    /** 翻盘条件：按真实回合差与速度生成，不再写死 */
+    function flipText() {
+      var parts = [];
+      var d = c.diff;
+      if (d >= 3) {
+        parts.push('优势很大（' + c.diff + ' 回合差），只有被换人针对才可能翻盘');
+      } else if (d >= 1) {
+        parts.push('小优，' + foiKill + ' 回合内打不死就会被拖平');
+      } else if (d === 0) {
+        parts.push('均势，谁先手谁占便宜（' + (c.fast ? '目前我方先手' : '目前对方先手') + '）');
+      } else {
+        parts.push('劣势（' + c.diff + ' 回合），只能靠换人或斩杀线翻盘');
+      }
+      if (!c.fast && d <= 1) {
+        parts.push('对方速度 ' + spF + ' 压过我方 ' + spM + '，先手权在对方手上');
+      }
+      if (oneShot < 100) {
+        parts.push('一击只能打掉 ' + oneShot + '%，需要 ' + myKill + ' 回合');
+      }
+      if (myKill >= 4) {
+        parts.push('战斗会拖长，对手有更多回复/换人机会');
+      }
+      return '<b>会被翻盘的条件</b>：' + parts.join('；') + '。';
+    }
 
     function row(k, v, extra) {
       return '<div class="row"><span class="k">' + k + '</span><span class="v">' + v +
