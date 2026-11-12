@@ -741,7 +741,7 @@
       var b = document.createElement("button");
       b.type = "button";
       b.className = "slot" + (i === state[side].active ? " on" : "");
-      b.style.background = pet ? elColor(pet.el) + "0f" : "#fff";
+      b.style.background = pet ? elColor(pet.el) + "22" : "#fff";
       var role = pet ? ROLE[roleOf(pet)] : null;
       var bst = benchS[i] || { hp: 0, max: 1, energy: 0 };
       var curHp = i === state[side].active ? state[side].hp : bst.hp;
@@ -799,8 +799,8 @@
   function renderCard(side) {
     var pet = sidePet(side), s = state[side], st = sideStats(side);
     var head = $(side + "Card").querySelector(".card-head");
-    // 卡片头统一中性，只用左侧色条标记属性
     head.style.setProperty("--head", elColor(pet.el));
+    head.style.setProperty("--head2", elColor(pet.el2 || pet.el));
     var nameEl = $(side + "NameText") || $(side + "Name");
     if (nameEl) nameEl.textContent = pet.n;
     $(side + "Tags").innerHTML = "<span class='tag'>" + pet.el + "</span>" + (pet.el2 ? "<span class='tag'>" + pet.el2 + "</span>" : "") +
@@ -5639,7 +5639,7 @@
     $("pickerList").innerHTML = list.map(function (x) {
       var sp = typeof spriteSrc === "function" ? spriteSrc(x.n) : (window.SPRITES && window.SPRITES[x.n]);
       return "<button type='button' class='picker-item' data-pick='" + x.n + "'>" +
-        (sp ? "<img class='picker-thumb' src='" + sp + "' alt='' loading='lazy'>" : "<i class='picker-thumb' style='background:" + elColor(x.el) + "22" + ";border-radius:8px;opacity:.25'></i>") +
+        (sp ? "<img class='picker-thumb' src='" + sp + "' alt='' loading='lazy'>" : "<i class='picker-thumb' style='background:" + elColor(x.el) + ";border-radius:8px;opacity:.25'></i>") +
         "<span>" + x.n + "</span>" +
         "<span style='color:#8b8578;font-size:11px;margin-left:auto'>" + x.el + "</span></button>";
     }).join("") +
