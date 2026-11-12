@@ -21,8 +21,8 @@ table.tb{width:100%;border-collapse:separate;border-spacing:0;background:var(--p
 .tb th{font-size:10.5px;color:var(--di);font-weight:500;background:#1A1F28;
   padding:8px 10px;text-align:left;white-space:nowrap}
 .tb td{padding:8px 10px;border-top:1px solid var(--ln);vertical-align:middle}
-.tb td:first-child{min-width:150px}
-.tb th:first-child{min-width:150px}
+.tb td:first-child{min-width:200px}
+.tb th:first-child{min-width:200px}
 .tb tr:hover td{background:#1A1F28;cursor:pointer}
 .tb tr.on td{background:#1B2436}
 .sc{font-size:12px;font-weight:600;white-space:nowrap}
@@ -59,6 +59,25 @@ table.tb{width:100%;border-collapse:separate;border-spacing:0;background:var(--p
 @media(max-width:900px){.detail{grid-template-columns:1fr}.f7{grid-template-columns:repeat(2,1fr)}}
 .tb-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch}
 .tb-scroll .tb{min-width:860px}
+
+/* 窄屏（手机/内嵌）：表格改成卡片，避免挤成竖排 */
+@media (max-width:700px){
+  .tb-scroll{overflow-x:visible}
+  .tb{min-width:0 !important;background:transparent;border:0;border-radius:0}
+  .tb thead{display:none}
+  .tb tbody{display:block}
+  .tb tr{display:block;background:var(--p);border:1px solid var(--ln);
+    border-radius:11px;margin-bottom:8px;padding:10px 12px}
+  .tb tr.on{border-color:var(--acc);background:#1B2436}
+  .tb td{display:flex;align-items:center;gap:8px;border:0;padding:3px 0;min-width:0}
+  .tb td:first-child{min-width:0;display:block;padding-bottom:6px;margin-bottom:6px;
+    border-bottom:1px solid var(--ln)}
+  .tb td:not(:first-child)::before{
+    content:attr(data-label);flex:0 0 64px;font-size:10.5px;color:var(--di)
+  }
+  .tb td:last-child,.tb td:nth-last-child(2){justify-content:space-between}
+  .sc small{white-space:normal}
+}
 </style>
 </head>
 <body data-page="winrate">
@@ -180,9 +199,12 @@ table.tb{width:100%;border-collapse:separate;border-spacing:0;background:var(--p
       var on = k === sel ? ' on' : '';
       html += '<tr data-k="' + k + '" class="' + on.trim() + '">' +
         '<td><span class="sc">' + s.name + '<small>' + s.sub + '</small></span></td>';
-      phi.forEach(function (v) { html += '<td>' + spark(v) + '</td>'; });
-      html += '<td><span class="pctv ' + (pred >= 0.5 ? 'hi' : 'lo') + '">' + (pred * 100).toFixed(1) + '%</span></td>' +
-              '<td><span class="pctv">' + (sim * 100).toFixed(1) + '%</span></td></tr>';
+      var PHI_NAMES = ['φ₁ 存活', 'φ₂ 血差', 'φ₃ 覆盖', 'φ₄ 速线', 'φ₅ 对位', 'φ₆ 速度', 'φ₇ 推演'];
+      phi.forEach(function (v, pi) {
+        html += '<td data-label="' + PHI_NAMES[pi] + '">' + spark(v) + '</td>';
+      });
+      html += '<td data-label="模型胜率"><span class="pctv ' + (pred >= 0.5 ? 'hi' : 'lo') + '">' + (pred * 100).toFixed(1) + '%</span></td>' +
+              '<td data-label="模拟对照"><span class="pctv">' + (sim * 100).toFixed(1) + '%</span></td></tr>';
     });
     document.getElementById('tbody').innerHTML = html;
 
