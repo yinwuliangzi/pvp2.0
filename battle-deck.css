@@ -617,3 +617,21 @@ body.bd .bd-topbar ~ main.deck {
 body.fb-on .bd-glow,
 body.fb-on .bubble,
 body.fb-on .deck { display:none !important; }
+
+
+/* 技能卡：完整文案 */
+.skill-bubble .sb-bar{
+  height:5px; border-radius:99px; background:rgba(255,255,255,.16);
+  overflow:hidden; margin:4px 0 3px;
+}
+.skill-bubble .sb-bar i{
+  display:block; height:100%; border-radius:99px;
+  background:linear-gradient(90deg,#E8A23A,#F2C36B);
+}
+.skill-bubble .sb-pct{ font-size:10px; color:rgba(255,255,255,.6); margin:0 0 2px; }
+.skill-bubble .sb-pred{ font-size:10.5px; color:#9FB0FF; }
+.skill-bubble p{ margin:2px 0; font-size:11px; line-height:1.55; }
+.skill-bubble p.good{ color:#7DDDA8; }
+.skill-bubble p.warn{ color:#F0A08C; }
+.skill-bubble.fb.hot{ border-color:rgba(242,195,107,.6); }
+.bubble-list{ overflow-y:auto; }

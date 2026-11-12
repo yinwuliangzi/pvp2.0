@@ -6880,6 +6880,65 @@
   window.__lsSideStats = function (side) { return { pet: sidePet(side), stats: sideStats(side).stats, raw: state[side] }; };
   window.__lsHistory = function () { return state.history || []; };
 
+  /* 给悬浮作战页用：返回某一侧 4 个招式的完整文案（与计算器卡片一致） */
+  window.__lsMoveCards = function (side) {
+    try {
+      var attacker = sideStats(side);
+      var other = side === "mine" ? "foe" : "mine";
+      var defender = sideStats(other);
+      var raw = (side === "mine" ? state.mine.moves : state.foe.moves) || [];
+      var hpNow = Number(side === "mine" ? state.mine.hp : state.foe.hp) || 0;
+      var out = [];
+      raw.forEach(function (n) {
+        var sk0 = skillByName(n);
+        if (!sk0 || !sk0.n) return;
+        if (!sk0.p) {
+          out.push({
+            name: sk0.n, kind: sk0.t || "状态",
+            dmg: null, pct: 0, cost: Number(sk0.c) || 0,
+            note: (sk0.d || "").replace(/^✦/, "").slice(0, 120),
+            notes: [], skipped: [], stab: false, energyShort: false, preview: "", predict: "", score: null
+          });
+          return;
+        }
+        var eff = effSkill(side, sk0, attacker);
+        var ti = traitInfo(attacker.pet, eff || sk0, traitCtx(), side);
+        var dmg = hitDamage(side, sk0, attacker, defender, -1, false);
+        var pct = hpNow > 0 ? Math.min(100, dmg / hpNow * 100) : 0;
+        var cost = costOf(side, sk0);
+        var item = {
+          name: sk0.n,
+          kind: sk0.t || "物攻",
+          dmg: Math.round(dmg),
+          pct: Math.round(pct),
+          cost: cost,
+          stab: isStab(eff || sk0, attacker.pet),
+          notes: (ti && ti.notes) || [],
+          skipped: (ti && ti.skipped) || [],
+          energyShort: side === "mine" && (Number(state.mine.energy) || 0) < cost,
+          preview: (typeof previewLine === "function") ? previewLine(side, sk0, dmg, defender, hpNow) : "",
+          predict: "",
+          score: null
+        };
+        if (side === "mine") {
+          var best = 0;
+          var foeMoves = (state.foe.moves || []);
+          foeMoves.forEach(function (fn) {
+            var k = fn ? skillByName(fn) : null;
+            if (!k || !k.p) return;
+            var d2 = hitDamage("foe", k, defender, attacker);
+            if (d2 > best) best = d2;
+          });
+          var myHpLeft = Number(state.mine.hp) || 0;
+          item.predict = opponentLean(hpNow - dmg);
+          item.score = stateDelta(dmg >= hpNow, myHpLeft - best, best, (Number(state.mine.energy) || 0) - cost);
+        }
+        out.push(item);
+      });
+      return out;
+    } catch (e) { return []; }
+  };
+
   /* ---- 导出 6×6 对位数据，供 matrix/route/winrate 三个页面使用 ----
    * T[i][j] = [我方击杀所需回合, 对方击杀所需回合]
    * 用当前双方 6 只、各自 4 招里"对目标期望伤害最高"的那一招，

@@ -936,6 +936,64 @@
 (function () {
   var wrap = document.getElementById('fullBattle');
   if (!wrap) return;
-  document.body.classList.add('fb-on');
-  wrap.hidden = false;
+  // 保留三栏紧凑界面，不启用 iframe
+  wrap.hidden = true;
+  document.body.classList.remove('fb-on');
+})();
+
+
+/* 用计算器的完整数据重绘左右技能卡（含特性、推测、局面分，不省略文字） */
+(function () {
+  function esc(s) {
+    return String(s == null ? "" : s).replace(/[&<>]/g, function (c) {
+      return ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" })[c];
+    });
+  }
+
+  function cardHTML(m) {
+    if (!m) return "";
+    var hot = m.dmg != null && m.pct >= 100 ? " hot" : "";
+    var out = '<article class="skill-bubble fb' + hot + '">';
+    out += '<div class="sb-top"><b>' + esc(m.name) + '</b>';
+    out += '<i>' + (m.dmg != null ? esc(m.dmg) : esc(m.kind)) + '</i>';
+    out += '<span>耗能 ' + esc(m.cost) + '</span></div>';
+
+    if (m.dmg != null) {
+      out += '<div class="sb-bar"><i style="width:' + Math.min(100, m.pct) + '%"></i></div>';
+      out += '<p class="sb-pct">满血 ' + m.pct + '%</p>';
+    }
+    if (m.note) out += '<p>' + esc(m.note) + '</p>';
+    if (m.notes && m.notes.length) out += '<p class="good">特性：' + esc(m.notes.join("、")) + '</p>';
+    if (m.skipped && m.skipped.length) out += '<p class="warn">特性未计入：' + esc(m.skipped.join("、")) + '</p>';
+    if (m.stab) out += '<p>本系加成 ×1.25</p>';
+    if (m.energyShort) out += '<p class="warn">能量不够，要聚能</p>';
+    if (m.preview) out += '<p class="good">' + esc(m.preview) + '</p>';
+    if (m.predict) out += '<p class="sb-pred">↩ 推测：' + esc(m.predict) + '</p>';
+    if (m.score != null) {
+      var cls = m.score > 0 ? "good" : (m.score < 0 ? "warn" : "");
+      out += '<p class="' + cls + '">📊 局面 ' + (m.score > 0 ? "+" : "") + m.score + '</p>';
+    }
+    out += '</article>';
+    return out;
+  }
+
+  function renderBubbles() {
+    if (typeof window.__lsMoveCards !== "function") return;
+    ["mine", "foe"].forEach(function (sd) {
+      var box = document.getElementById(sd === "mine" ? "bubbleMineList" : "bubbleFoeList");
+      if (!box) return;
+      var list = window.__lsMoveCards(sd) || [];
+      if (!list.length) return;
+      box.innerHTML = list.map(cardHTML).join("");
+    });
+  }
+
+  window.__renderBubbles = renderBubbles;
+
+  function boot() {
+    renderBubbles();
+    setInterval(renderBubbles, 1500);
+  }
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", boot);
+  else boot();
 })();
