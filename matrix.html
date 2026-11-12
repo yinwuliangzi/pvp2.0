@@ -197,6 +197,24 @@
   function renderDetail(M, cells) {
     var m = D.my[sel.i], f = D.foe[sel.j], c = cells[sel.i][sel.j];
     var m2 = m, f2 = f;
+
+    // 轻提示
+    function flashMsg(txt) {
+      var t = document.getElementById('mxToast');
+      if (!t) {
+        t = document.createElement('div');
+        t.id = 'mxToast';
+        t.style.cssText = 'position:fixed;left:50%;bottom:28px;transform:translateX(-50%);' +
+          'background:#1D2740;color:#C3CDFF;border:1px solid #4D6BFE;border-radius:10px;' +
+          'padding:9px 16px;font-size:12.5px;z-index:9999;box-shadow:0 8px 24px rgba(0,0,0,.4);' +
+          'transition:opacity .25s;opacity:0';
+        document.body.appendChild(t);
+      }
+      t.textContent = txt;
+      t.style.opacity = '1';
+      clearTimeout(t._timer);
+      t._timer = setTimeout(function () { t.style.opacity = '0'; }, 1600);
+    }
     var eff = Core.effMods(M);
     var spM = Math.round(m.spd * eff.spdM), spF = Math.round(f.spd * eff.spdF);
     var win = c.diff > 0 || (c.diff === 0 && spM > spF);
@@ -229,16 +247,21 @@
       var lb = document.getElementById('lockBtn');
       var ab = document.getElementById('addBtn');
       if (lb) lb.addEventListener('click', function () {
-        lb.textContent = '已锁定 ' + m2.n + ' vs ' + f2.n;
+        try {
+          localStorage.setItem('luoke.lock', JSON.stringify({ mine: m2.n, foe: f2.n, diff: c.diff, at: Date.now() }));
+        } catch (e) {}
+        lb.textContent = '已锁定：' + m2.n + ' vs ' + f2.n;
         lb.style.borderColor = '#2FBF71';
         lb.style.color = '#7DDDA8';
+        flashMsg('已锁定这个对位，对局路径页会显示它');
       });
       if (ab) ab.addEventListener('click', function () {
         try {
           var saved = JSON.parse(localStorage.getItem('luoke.sandbox') || '[]');
           saved.push({ mine: m2.n, foe: f2.n, diff: c.diff, at: Date.now() });
           localStorage.setItem('luoke.sandbox', JSON.stringify(saved.slice(-20)));
-          ab.textContent = '已加入（共 ' + Math.min(saved.length, 20) + ' 条）';
+          ab.textContent = '已加入沙盘（共 ' + Math.min(saved.length, 20) + ' 条）';
+          flashMsg('已加入沙盘：' + m2.n + ' vs ' + f2.n);
         } catch (e) { ab.textContent = '加入失败'; }
       });
     }, 0);

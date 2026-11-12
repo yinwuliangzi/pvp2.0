@@ -60,6 +60,12 @@
 .how{font-size:11.5px;color:var(--mu);line-height:1.85}
 .how b{color:var(--tx)}
 @media(max-width:900px){.route{grid-template-columns:1fr}.sum{grid-template-columns:repeat(2,1fr)}}
+
+.lockbar{display:flex;align-items:center;gap:10px;background:#132019;border:1px solid #2FBF71;
+  border-radius:10px;padding:9px 13px;margin-bottom:12px;font-size:12.5px;color:#7DDDA8}
+.lockbar b{color:#D6D8DC}
+.lockbar button{margin-left:auto;background:none;border:1px solid #2F6B4B;color:#7DDDA8;
+  border-radius:7px;padding:3px 10px;font-size:11.5px;cursor:pointer}
 </style>
 </head>
 <body data-page="route">
@@ -69,6 +75,7 @@
     <span class="sub">从首发到收尾 · 双方按最优应对推演</span>
   </div>
 
+  <div id="lockBar" class="lockbar" hidden></div>
   <div class="sum" id="sum"></div>
   <div class="leadbar"><span class="lb">我方首发</span><div id="leadM" style="display:flex;gap:6px;flex-wrap:wrap"></div></div>
   <div class="leadbar"><span class="lb">对方首发</span><div id="leadF" style="display:flex;gap:6px;flex-wrap:wrap"></div></div>
@@ -264,6 +271,27 @@
   if (window.DuelData && window.DuelData.listen) {
     window.DuelData.listen(function () { render(); });
   }
+
+  // 显示矩阵页锁定的对位
+  (function renderLock() {
+    var bar = document.getElementById('lockBar');
+    if (!bar) return;
+    var raw = null;
+    try { raw = localStorage.getItem('luoke.lock'); } catch (e) {}
+    if (!raw) { bar.hidden = true; return; }
+    var o = null;
+    try { o = JSON.parse(raw); } catch (e) {}
+    if (!o || !o.mine) { bar.hidden = true; return; }
+    bar.hidden = false;
+    bar.innerHTML = '已锁定对位：<b>' + o.mine + ' vs ' + o.foe + '</b>' +
+      '（回合差 ' + (o.diff > 0 ? '+' : '') + o.diff + '）' +
+      '<button type="button" id="unlockBtn">取消锁定</button>';
+    var ub = document.getElementById('unlockBtn');
+    if (ub) ub.addEventListener('click', function () {
+      try { localStorage.removeItem('luoke.lock'); } catch (e) {}
+      bar.hidden = true;
+    });
+  })();
 })();
 </script>
 </body>
