@@ -968,7 +968,7 @@
       row.className = "move-row" + (isCustom ? " custom" : "");
       row.innerHTML =
         "<i class='mdot' style='background:" + (sk && sk.e ? elColor(sk.e) : "#c9c3b6") + "'></i>" +
-        "<div class='mname'><input list='skillList' placeholder='选择或搜索技能' value='" + (sk ? sk.n : "") + "'><button type='button' class='mclear' title='清空'>×</button>" +
+        "<div class='mname'><input class='mpick' readonly inputmode='none' placeholder='点此选择技能' value='" + (sk ? sk.n : "") + "'><button type='button' class='mclear' title='清空'>×</button>" +
           (name ? "<button type='button' class='medit' title='改数值'>" + (hasOverride ? "恢复" : "改") + "</button>" : "") +
           (i > 0 ? "<button type='button' class='mmove' data-move='" + side + ":" + i + ":-1' title='上移'>↑</button>" : "") +
           (i < state[side].moves.length - 1 ? "<button type='button' class='mmove' data-move='" + side + ":" + i + ":1' title='下移'>↓</button>" : "") +
@@ -984,7 +984,7 @@
             "<span class='mtag" + (sk && sk.r ? " on" : "") + "'>" + (sk && sk.r ? "先手+" + sk.r : "耗能 " + (sk ? sk.c : "—")) + "</span>");
       box.appendChild(row);
       if (window.__bindSkillPickers) {
-        Array.prototype.forEach.call(row.querySelectorAll("input[list='skillList']"), window.__bindSkillPickers);
+        Array.prototype.forEach.call(row.querySelectorAll("input.mpick"), window.__bindSkillPickers);
       }
 
       var editBtn = row.querySelector(".medit");
@@ -6914,21 +6914,8 @@
   });
   document.body.appendChild(dl);
 
-  // ===== 自定义技能候选（datalist 在安卓 WebView 里不显示）=====
-  var __skTip = null;
-  function __skTipEl() {
-    if (__skTip) return __skTip;
-    var d = document.createElement("div");
-    d.className = "sk-tip";
-    d.style.display = "none";
-    document.body.appendChild(d);
-    __skTip = d;
-    return d;
-  }
-
-  function __hideSkTip() {
-    if (__skTip) __skTip.style.display = "none";
-  }
+  // ===== 技能选择面板（安卓没有 datalist，改成只读入口 + 面板）=====
+  var __skPanel = null, __skInput = null, __skQuery = "";
 
   function __allSkillNames() {
     var names = SKILLS.map(function (s) { return s.n; });
@@ -6938,58 +6925,94 @@
     return names;
   }
 
+  function __closeSkPanel() {
+    if (__skPanel && __skPanel.parentNode) __skPanel.parentNode.removeChild(__skPanel);
+    __skPanel = null;
+    __skInput = null;
+    __skQuery = "";
+  }
+
+  function __renderSkList() {
+    if (!__skPanel) return;
+    var all = __allSkillNames();
+    var q = __skQuery.trim();
+    var list = q ? all.filter(function (n) { return n.indexOf(q) >= 0; }) : all;
+    list = list.slice(0, 300);
+    var box = __skPanel.querySelector(".skp-list");
+    if (!list.length && q) {
+      box.innerHTML = "<div class='skp-empty'>没有匹配的技能<br><span>可直接用「" + q + "」</span></div>" +
+        "<div class='skp-item' data-custom='1'><span class='skp-n'>使用「" + q + "」</span></div>";
+    } else {
+      box.innerHTML = list.map(function (n) {
+        var sk = skillByName(n) || {};
+        return "<div class='skp-item' data-n='" + String(n).replace(/'/g, "&#39;") + "'>" +
+          "<span class='skp-n'>" + n + "</span>" +
+          "<span class='skp-m'>" + (sk.e || "") + (sk.p == null ? "" : " · 威力 " + sk.p) +
+          (sk.c == null ? "" : " · 耗能 " + sk.c) + "</span></div>";
+      }).join("");
+    }
+
+    Array.prototype.forEach.call(box.querySelectorAll(".skp-item"), function (it) {
+      it.addEventListener("click", function () {
+        var v = it.getAttribute("data-custom") ? __skQuery.trim() : it.getAttribute("data-n");
+        if (!v) return;
+        if (__skInput) {
+          __skInput.value = v;
+          __skInput.dispatchEvent(new Event("input", { bubbles: true }));
+          __skInput.dispatchEvent(new Event("change", { bubbles: true }));
+        }
+        __closeSkPanel();
+      });
+    });
+  }
+
+  function __openSkPanel(input) {
+    __closeSkPanel();
+    __skInput = input;
+    __skQuery = "";
+
+    var mask = document.createElement("div");
+    mask.className = "skp-mask";
+    mask.innerHTML =
+      "<div class='skp-panel'>" +
+        "<div class='skp-head'><b>选择技能</b><button type='button' class='skp-x'>×</button></div>" +
+        "<div class='skp-search'><input class='skp-q' placeholder='搜索技能名（可不填）'></div>" +
+        "<div class='skp-list'></div>" +
+      "</div>";
+    document.body.appendChild(mask);
+    __skPanel = mask;
+    __renderSkList();
+
+    mask.querySelector(".skp-x").addEventListener("click", __closeSkPanel);
+    mask.addEventListener("click", function (e) { if (e.target === mask) __closeSkPanel(); });
+
+    var qi = mask.querySelector(".skp-q");
+    qi.addEventListener("input", function () { __skQuery = qi.value; __renderSkList(); });
+    // 键盘弹出时压缩面板高度，保证列表可见
+    if (window.visualViewport) {
+      var fit = function () {
+        if (!__skPanel) return;
+        var p = __skPanel.querySelector(".skp-panel");
+        if (p) p.style.maxHeight = Math.max(220, window.visualViewport.height - 90) + "px";
+      };
+      window.visualViewport.addEventListener("resize", fit);
+      fit();
+    }
+  }
+
   function __attachSkillPicker(input) {
     if (!input || input.__skBound) return;
     input.__skBound = true;
-
-    function show() {
-      var q = String(input.value || "").trim();
-      var all = __allSkillNames();
-      // 输入框里已经是某个完整技能名时，不拿它当筛选词（否则只显示一条）
-      if (q && all.indexOf(q) >= 0) q = "";
-      var list = q ? all.filter(function (n) { return n.indexOf(q) >= 0; }) : all;
-      list = list.slice(0, 60);
-      if (!list.length) { __hideSkTip(); return; }
-
-      var tip = __skTipEl();
-      tip.innerHTML = list.map(function (n) {
-        var sk = skillByName(n) || {};
-        return "<div class='sk-item' data-n='" + String(n).replace(/'/g, "&#39;") + "'>" +
-          "<span class='sk-n'>" + n + "</span>" +
-          "<span class='sk-m'>" + (sk.e || "") + " " + (sk.p == null ? "" : sk.p) + "</span></div>";
-      }).join("");
-
-      var r = input.getBoundingClientRect();
-      tip.style.left = Math.max(6, r.left) + "px";
-      tip.style.top = (r.bottom + 4 + window.scrollY) + "px";
-      tip.style.width = Math.max(220, r.width) + "px";
-      tip.style.display = "block";
-
-      Array.prototype.forEach.call(tip.querySelectorAll(".sk-item"), function (it) {
-        var pick = function (ev) {
-          ev.preventDefault();
-          ev.stopPropagation();
-          input.value = it.getAttribute("data-n");
-          input.dispatchEvent(new Event("input", { bubbles: true }));
-          input.dispatchEvent(new Event("change", { bubbles: true }));
-          __hideSkTip();
-          try { input.blur(); } catch (e) {}
-        };
-        it.addEventListener("touchstart", pick, { passive: false });
-        it.addEventListener("mousedown", pick);
-      });
-    }
-
-    input.addEventListener("focus", show);
-    input.addEventListener("click", show);
-    input.addEventListener("input", show);
-    input.addEventListener("keyup", show);
-    input.addEventListener("blur", function () { setTimeout(__hideSkTip, 180); });
+    input.addEventListener("click", function (e) {
+      e.preventDefault();
+      e.stopPropagation();
+      __openSkPanel(input);
+    });
   }
 
   function __bindSkillPickers(root) {
     Array.prototype.forEach.call(
-      (root || document).querySelectorAll("input[list='skillList']"),
+      (root || document).querySelectorAll("input.mpick"),
       __attachSkillPicker
     );
   }
@@ -7000,13 +7023,6 @@
     new MutationObserver(function () { try { __bindSkillPickers(); } catch (e) {} })
       .observe(document.body, { childList: true, subtree: true });
   } catch (e) {}
-
-  document.addEventListener("click", function (e) {
-    if (__skTip && __skTip.style.display === "block" && !__skTip.contains(e.target)) {
-      var t = e.target;
-      if (!(t && t.getAttribute && t.getAttribute("list") === "skillList")) __hideSkTip();
-    }
-  }, true);
 
 
   ["mine", "foe"].forEach(function (side) {
