@@ -604,7 +604,7 @@
   };
   function normalizeSave(saved) {
     if (!saved || typeof saved !== "object") return;
-    ["mine", "foe"].forEach(function (side) {
+  ["mine", "foe"].forEach(function (side) {
       var base = state[side], got = saved[side] || {};
       var merged = Object.assign({}, base, got);
       if (!Array.isArray(merged.moves) || !merged.moves.length) merged.moves = DEFAULT_MOVES[side].slice();
@@ -983,6 +983,9 @@
             "<input class='mcat' readonly value='" + (sk ? sk.t : "—") + "'>" +
             "<span class='mtag" + (sk && sk.r ? " on" : "") + "'>" + (sk && sk.r ? "先手+" + sk.r : "耗能 " + (sk ? sk.c : "—")) + "</span>");
       box.appendChild(row);
+      if (window.__bindSkillPickers) {
+        Array.prototype.forEach.call(row.querySelectorAll("input[list='skillList']"), window.__bindSkillPickers);
+      }
 
       var editBtn = row.querySelector(".medit");
       if (editBtn) editBtn.addEventListener("click", function () {
@@ -6910,6 +6913,101 @@
     dl.appendChild(o);
   });
   document.body.appendChild(dl);
+
+  // ===== 自定义技能候选（datalist 在安卓 WebView 里不显示）=====
+  var __skTip = null;
+  function __skTipEl() {
+    if (__skTip) return __skTip;
+    var d = document.createElement("div");
+    d.className = "sk-tip";
+    d.style.display = "none";
+    document.body.appendChild(d);
+    __skTip = d;
+    return d;
+  }
+
+  function __hideSkTip() {
+    if (__skTip) __skTip.style.display = "none";
+  }
+
+  function __allSkillNames() {
+    var names = SKILLS.map(function (s) { return s.n; });
+    Object.keys(CUSTOM_SEED || {}).forEach(function (n) {
+      if (names.indexOf(n) < 0) names.push(n);
+    });
+    return names;
+  }
+
+  function __attachSkillPicker(input) {
+    if (!input || input.__skBound) return;
+    input.__skBound = true;
+
+    function show() {
+      var q = String(input.value || "").trim();
+      var all = __allSkillNames();
+      // 输入框里已经是某个完整技能名时，不拿它当筛选词（否则只显示一条）
+      if (q && all.indexOf(q) >= 0) q = "";
+      var list = q ? all.filter(function (n) { return n.indexOf(q) >= 0; }) : all;
+      list = list.slice(0, 60);
+      if (!list.length) { __hideSkTip(); return; }
+
+      var tip = __skTipEl();
+      tip.innerHTML = list.map(function (n) {
+        var sk = skillByName(n) || {};
+        return "<div class='sk-item' data-n='" + String(n).replace(/'/g, "&#39;") + "'>" +
+          "<span class='sk-n'>" + n + "</span>" +
+          "<span class='sk-m'>" + (sk.e || "") + " " + (sk.p == null ? "" : sk.p) + "</span></div>";
+      }).join("");
+
+      var r = input.getBoundingClientRect();
+      tip.style.left = Math.max(6, r.left) + "px";
+      tip.style.top = (r.bottom + 4 + window.scrollY) + "px";
+      tip.style.width = Math.max(220, r.width) + "px";
+      tip.style.display = "block";
+
+      Array.prototype.forEach.call(tip.querySelectorAll(".sk-item"), function (it) {
+        var pick = function (ev) {
+          ev.preventDefault();
+          ev.stopPropagation();
+          input.value = it.getAttribute("data-n");
+          input.dispatchEvent(new Event("input", { bubbles: true }));
+          input.dispatchEvent(new Event("change", { bubbles: true }));
+          __hideSkTip();
+          try { input.blur(); } catch (e) {}
+        };
+        it.addEventListener("touchstart", pick, { passive: false });
+        it.addEventListener("mousedown", pick);
+      });
+    }
+
+    input.addEventListener("focus", show);
+    input.addEventListener("click", show);
+    input.addEventListener("input", show);
+    input.addEventListener("keyup", show);
+    input.addEventListener("blur", function () { setTimeout(__hideSkTip, 180); });
+  }
+
+  function __bindSkillPickers(root) {
+    Array.prototype.forEach.call(
+      (root || document).querySelectorAll("input[list='skillList']"),
+      __attachSkillPicker
+    );
+  }
+  window.__bindSkillPickers = __bindSkillPickers;
+  setTimeout(function () { try { __bindSkillPickers(); } catch (e) {} }, 0);
+  setTimeout(function () { try { __bindSkillPickers(); } catch (e) {} }, 800);
+  try {
+    new MutationObserver(function () { try { __bindSkillPickers(); } catch (e) {} })
+      .observe(document.body, { childList: true, subtree: true });
+  } catch (e) {}
+
+  document.addEventListener("click", function (e) {
+    if (__skTip && __skTip.style.display === "block" && !__skTip.contains(e.target)) {
+      var t = e.target;
+      if (!(t && t.getAttribute && t.getAttribute("list") === "skillList")) __hideSkTip();
+    }
+  }, true);
+
 
   ["mine", "foe"].forEach(function (side) {
     var m = state[side].moves || [];
