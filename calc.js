@@ -1017,7 +1017,7 @@
       });
 
       var input = row.querySelector(".mname input");
-      input.addEventListener("change", function () {
+      var applyMoveName = function () {
         var name2 = input.value.trim();
         state[side].moves[i] = name2;
         if (name2 && !SKILLS.some(function (x) { return x.n === name2; }) && !(state.custom && state.custom[name2])) {
@@ -1026,7 +1026,10 @@
           state.custom[name2] = seed ? Object.assign({}, seed, { n: name2 }) : { n: name2, p: 0, e: "普通", t: "物攻", c: 3 };
         }
         save(); buildMoves(side); fillMoveSelects(); renderBattle();
-      });
+      };
+      input.__skApply = applyMoveName;
+      input.addEventListener("input", applyMoveName);
+      input.addEventListener("change", applyMoveName);
       row.querySelector(".mclear").addEventListener("click", function () {
         state[side].moves[i] = "";
         save(); buildMoves(side); renderBattle();
@@ -6389,6 +6392,23 @@
       if (cfg.model) $("ocrModel").value = cfg.model;
       if (cfg.key) $("ocrKey").value = cfg.key;
     } catch (e) {}
+    // 一键填入常用视觉服务
+    var PRESETS = {
+      DS:  { ep: "https://api.deepseek.com/chat/completions", model: "deepseek-flash",
+             help: "DeepSeek：去 platform.deepseek.com 建 Key，模型是 deepseek-flash（deepseek-chat 不支持图片）。" },
+      GLM: { ep: "https://open.bigmodel.cn/api/paas/v4/chat/completions", model: "glm-4v-flash",
+             help: "智谱：去 bigmodel.cn 建 Key，glm-4v-flash 有免费额度。" }
+    };
+    function applyPreset(k) {
+      var p = PRESETS[k]; if (!p) return;
+      $("ocrEndpoint").value = p.ep;
+      $("ocrModel").value = p.model;
+      if ($("ocrHelp")) $("ocrHelp").textContent = p.help;
+      try { msg("已填入 " + p.model + "，只需再填 API Key"); } catch (e) {}
+    }
+    if ($("ocrPresetDS")) $("ocrPresetDS").addEventListener("click", function () { applyPreset("DS"); });
+    if ($("ocrPresetGLM")) $("ocrPresetGLM").addEventListener("click", function () { applyPreset("GLM"); });
+
     $("ocrClose").addEventListener("click", function () { modal.hidden = true; });
     if ($("ocrOpen")) $("ocrOpen").addEventListener("click", function () { modal.hidden = false; });
 
@@ -6435,13 +6455,30 @@
               ] }],
               temperature: 0
             })
-          }).then(function (r) { return r.json(); }).then(function (j) {
+          }).then(function (r) {
+            return r.text().then(function (txt) {
+              return { status: r.status, ok: r.ok, txt: txt };
+            });
+          }).then(function (res) {
+            var j = null;
+            try { j = JSON.parse(res.txt); } catch (e) {}
+            if (!res.ok) {
+              var em = (j && j.error && (j.error.message || j.error.code)) || res.txt.slice(0, 160);
+              return resolve({ ok: false, msg: "HTTP " + res.status + "：" + em });
+            }
+            if (!j) return resolve({ ok: false, msg: "返回不是 JSON：" + res.txt.slice(0, 120) });
             var txt = (((j.choices || [])[0] || {}).message || {}).content || "";
+            if (!txt) {
+              var r2 = (j.error && j.error.message) || "模型没有返回内容";
+              return resolve({ ok: false, msg: r2 });
+            }
             var data = parseJsonFrom(txt);
-            if (!data) return resolve({ ok: false, msg: "无 JSON" });
+            if (!data) return resolve({ ok: false, msg: "模型没按格式回 JSON：" + txt.slice(0, 100) });
             try { applyOcr(data); pushSnapshot(file.name); } catch (e) {}
             resolve({ ok: true, data: data });
-          }).catch(function (e) { resolve({ ok: false, msg: e.message }); });
+          }).catch(function (e) {
+            resolve({ ok: false, msg: "请求失败：" + e.message });
+          });
         };
         rd.onerror = function () { resolve({ ok: false, msg: "读取失败" }); };
         rd.readAsDataURL(file);
@@ -6454,7 +6491,12 @@
       var model = ($("ocrModel").value || "").trim();
       var key = ($("ocrKey").value || "").trim();
       if (!files.length) return msg("先选截图（可多选）", true);
-      if (!ep || !model) return msg("填接口地址和模型名", true);
+      if (!ep || !model) return msg("点上面的「用 DeepSeek」一键填好，再填 Key", true);
+      // 少写路径时自动补全
+      if (/^https?:\/\/[^/]+\/?$/.test(ep)) ep = ep.replace(/\/$/, "") + "/chat/completions";
+      if (/deepseek/i.test(ep) && /deepseek-chat|deepseek-reasoner/i.test(model)) {
+        return msg("deepseek-chat 不支持图片，模型请改成 deepseek-flash", true);
+      }
       try { localStorage.setItem(KEY, JSON.stringify({ endpoint: ep, model: model, key: key })); } catch (e) {}
       var cfg = { ep: ep, model: model, key: key };
       var prog = $("ocrProgress");
@@ -6957,9 +6999,13 @@
         var v = it.getAttribute("data-custom") ? __skQuery.trim() : it.getAttribute("data-n");
         if (!v) return;
         if (__skInput) {
+          var old = __skInput.value;
           __skInput.value = v;
-          __skInput.dispatchEvent(new Event("input", { bubbles: true }));
-          __skInput.dispatchEvent(new Event("change", { bubbles: true }));
+          // readonly 输入框的 change 不一定触发，这里两种都派发；同时兜底直接调回调
+          try { __skInput.dispatchEvent(new Event("input", { bubbles: true })); } catch (e) {}
+          try { __skInput.dispatchEvent(new Event("change", { bubbles: true })); } catch (e) {}
+          if (__skInput.value !== v) __skInput.value = v;
+          if (old === v && typeof __skInput.__skApply === "function") __skInput.__skApply(v);
         }
         __closeSkPanel();
       });

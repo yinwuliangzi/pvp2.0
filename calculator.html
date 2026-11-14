@@ -392,10 +392,15 @@ body.df-open{ overflow:hidden; }
 <div id="ocrModal" class="ocr-modal" hidden>
   <div class="ocr-box">
     <div class="ocr-head"><b>截图识别（可选）</b><button type="button" id="ocrClose">×</button></div>
-    <p class="hint">上传/粘贴一张对战截图，由视觉模型读出双方血量、能量与招式。<b>需要你自己的 API Key</b>（只存在本机）。</p>
-    <label class="field"><span>接口地址</span><input id="ocrEndpoint" placeholder="https://api.openai.com/v1/chat/completions"></label>
-    <label class="field"><span>模型</span><input id="ocrModel" placeholder="gpt-4o-mini / glm-4v-flash"></label>
+    <p class="hint">上传一张对战截图，由视觉模型读出双方血量、能量与招式。<b>需要你自己的 API Key</b>（只存在本机，不上传）。</p>
+    <div class="turn-actions" style="margin-bottom:8px">
+      <button type="button" class="tbtn" id="ocrPresetDS">用 DeepSeek（推荐）</button>
+      <button type="button" class="tbtn ghost" id="ocrPresetGLM">用智谱</button>
+    </div>
+    <label class="field"><span>接口地址</span><input id="ocrEndpoint" placeholder="https://api.deepseek.com/chat/completions"></label>
+    <label class="field"><span>模型</span><input id="ocrModel" placeholder="deepseek-flash"></label>
     <label class="field"><span>API Key</span><input id="ocrKey" type="password" placeholder="sk-..."></label>
+    <p class="hint" id="ocrHelp">DeepSeek：去 platform.deepseek.com 建 Key，模型填 <code>deepseek-flash</code>（旧名 deepseek-chat 不支持图片）。</p>
     <label class="field"><span>截图</span><input id="ocrFile" type="file" accept="image/*" multiple></label>
     <div class="turn-actions"><button type="button" class="tbtn" id="ocrRun">识别并填入</button></div>
     <p class="hint" id="ocrMsg"></p>
