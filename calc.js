@@ -597,6 +597,36 @@
   };
 
   var KEY = "luoke.calc.v2";
+
+  // ===== 每格独立配招 =====
+  // 6 只共用 state[side] 的"当前精灵"数据，切格子时只隔离招式与属性，
+  // 血量/能量仍由 bench 管理（不在这里动，避免影响出招与换人逻辑）
+  function saveSlotProfile(side) {
+    var s = state[side];
+    if (!s || s.active == null) return;
+    s.slotProfiles = s.slotProfiles || {};
+    s.slotProfiles[s.active] = {
+      moves: (s.moves || []).slice(),
+      nature: s.nature || ""
+    };
+  }
+
+  function loadSlotProfile(side, idx) {
+    var s = state[side];
+    if (!s) return;
+    s.slotProfiles = s.slotProfiles || {};
+    var prof = s.slotProfiles[idx];
+    if (prof) {
+      s.moves = (prof.moves || ["", "", "", ""]).slice();
+      s.nature = prof.nature || "";
+      return;
+    }
+    // 第一次点到这只：用它自己的可学招式，别沿用上一只的
+    s.moves = ["", "", "", ""];
+    try { autofillMoves(side, true); } catch (e) {}
+    saveSlotProfile(side);
+  }
+
   var state = {
     mine: { st: { mark: 0, wind: 0, charge: 0, photo: 0, spike: 0, slow: 0, combo: 1, poison: 0, burn: 0 }, slots: PETS.slice(0, 6).map(function (p) { return p.n; }), active: 0, level: 60, star: 5, iv: { hp: 10, atk: 10, def: 10, ma: 10, md: 10, spe: 10 }, nature: "", hp: 400, energy: 5, mana: 4, priority: 0, status: "健康", moves: ["", "", "", ""] },
     foe: { st: { mark: 0, wind: 0, charge: 0, photo: 0, spike: 0, slow: 0, combo: 1, poison: 0, burn: 0 }, slots: PETS.slice(6, 12).map(function (p) { return p.n; }), active: 0, level: 60, star: 5, iv: { hp: 10, atk: 10, def: 10, ma: 10, md: 10, spe: 10 }, nature: "", hp: 300, energy: 5, mana: 4, priority: 0, status: "健康", moves: ["", "", "", ""] },
@@ -793,7 +823,14 @@
           save(); renderAll();
           return;
         }
-        state[side].active = i; save(); renderAll();
+        var oldIdx = state[side].active;
+        if (oldIdx !== i) {
+          saveSlotProfile(side);       // 存下当前这只
+          state[side].active = i;
+          loadSlotProfile(side, i);    // 载入目标这只（没有就是空白）
+          state[side].benchKey = null;
+        }
+        save(); renderAll();
       });
       box.appendChild(b);
     });
@@ -2184,7 +2221,13 @@
       var cand = (s.active + 1 + k) % s.slots.length;
       if (bench[cand] && Number(bench[cand].hp) > 0) { next = cand; break; }
     }
-    s.active = next;
+    if (next !== s.active) {
+      saveSlotProfile(side);          // 存下换人前这只的配招
+      s.active = next;
+      loadSlotProfile(side, next);    // 载入换上这只的配招
+    } else {
+      s.active = next;
+    }
     var b = bench[next] || {};
     var st = sideStats(side);
     s.hp = Number(b.hp) > 0 ? Math.min(st.stats.hp, Number(b.hp)) : st.stats.hp;
@@ -5753,6 +5796,12 @@
       var slot = state[pickingSide].active;
       var changed = state[pickingSide].slots[slot] !== name;
       state[pickingSide].slots[slot] = name;
+      if (changed) {
+        // 换了另一只精灵：该格旧配置作废（只清存档，不动当前状态）
+        var ss = state[pickingSide];
+        ss.slotProfiles = ss.slotProfiles || {};
+        delete ss.slotProfiles[slot];
+      }
       var st = sideStats(pickingSide);
       state[pickingSide].hp = st.stats.hp;
       // 换了精灵，招式跟着换成它的可学招式；同一只重复选择则保留手改
