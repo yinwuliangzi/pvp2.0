@@ -601,14 +601,19 @@
   // ===== 每格独立配招 =====
   // 6 只共用 state[side] 的"当前精灵"数据，切格子时只隔离招式与属性，
   // 血量/能量仍由 bench 管理（不在这里动，避免影响出招与换人逻辑）
+  var SLOT_FIELDS = ["moves", "nature", "level", "star", "iv", "energy", "hp0", "status", "bloodSel", "ball"];
+
   function saveSlotProfile(side) {
     var s = state[side];
     if (!s || s.active == null) return;
     s.slotProfiles = s.slotProfiles || {};
-    s.slotProfiles[s.active] = {
-      moves: (s.moves || []).slice(),
-      nature: s.nature || ""
-    };
+    var o = {};
+    SLOT_FIELDS.forEach(function (k) {
+      if (s[k] === undefined) return;
+      o[k] = (typeof s[k] === "object" && s[k] !== null) ? JSON.parse(JSON.stringify(s[k])) : s[k];
+    });
+    o.hp = s.hp;
+    s.slotProfiles[s.active] = o;
   }
 
   function loadSlotProfile(side, idx) {
@@ -617,12 +622,27 @@
     s.slotProfiles = s.slotProfiles || {};
     var prof = s.slotProfiles[idx];
     if (prof) {
-      s.moves = (prof.moves || ["", "", "", ""]).slice();
-      s.nature = prof.nature || "";
+      SLOT_FIELDS.forEach(function (k) {
+        if (prof[k] === undefined) return;
+        s[k] = (typeof prof[k] === "object" && prof[k] !== null) ? JSON.parse(JSON.stringify(prof[k])) : prof[k];
+      });
+      // 血量以这只自己的存档为准（bench 由战斗流程维护，切格子时不动它）
+      if (Number(prof.hp) > 0) s.hp = Number(prof.hp);
+      saveSlotProfile(side);
       return;
     }
-    // 第一次点到这只：用它自己的可学招式，别沿用上一只的
+    // 第一次点到这只：等级/星级/个体值用默认，招式和满血按它自己算
     s.moves = ["", "", "", ""];
+    s.nature = "";
+    s.level = 60;
+    s.star = 5;
+    s.iv = { hp: 10, atk: 10, def: 10, ma: 10, md: 10, spe: 10 };
+    s.status = "健康";
+    try {
+      var st0 = sideStats(side);
+      s.hp = st0.stats.hp;
+      s.hp0 = st0.stats.hp;
+    } catch (e) {}
     try { autofillMoves(side, true); } catch (e) {}
     saveSlotProfile(side);
   }
