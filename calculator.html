@@ -402,7 +402,10 @@ body.df-open{ overflow:hidden; }
     <label class="field"><span>API Key</span><input id="ocrKey" type="password" placeholder="sk-..."></label>
     <p class="hint" id="ocrHelp">DeepSeek：去 platform.deepseek.com 建 Key，模型填 <code>deepseek-flash</code>（旧名 deepseek-chat 不支持图片）。</p>
     <label class="field"><span>截图</span><input id="ocrFile" type="file" accept="image/*" multiple></label>
-    <div class="turn-actions"><button type="button" class="tbtn" id="ocrRun">识别并填入</button></div>
+    <div class="turn-actions">
+      <button type="button" class="tbtn" id="ocrRun">识别并填入</button>
+      <button type="button" class="tbtn ghost" id="ocrTest">测试连接</button>
+    </div>
     <p class="hint" id="ocrMsg"></p>
     <div class="relay-raw" id="ocrProgress"></div>
   </div>

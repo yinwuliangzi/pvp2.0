@@ -6475,6 +6475,40 @@
       if ($("ocrHelp")) $("ocrHelp").textContent = p.help;
       try { msg("已填入 " + p.model + "，只需再填 API Key"); } catch (e) {}
     }
+    // 测试连接：只发一句话，确认地址/模型/Key 是否可用
+    if ($("ocrTest")) $("ocrTest").addEventListener("click", function () {
+      var ep = ($("ocrEndpoint").value || "").trim();
+      var model = ($("ocrModel").value || "").trim();
+      var key = ($("ocrKey").value || "").trim().replace(/^Bearer\s+/i, "");
+      if (!ep || !model || !key) return msg("地址、模型、Key 三项都要填", true);
+      if (/^https?:\/\/[^/]+\/?$/.test(ep)) ep = ep.replace(/\/$/, "") + "/chat/completions";
+      msg("测试中…");
+      fetch(ep, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: "Bearer " + key },
+        body: JSON.stringify({
+          model: model,
+          messages: [{ role: "user", content: "只回复两个字：可用" }],
+          max_tokens: 16, temperature: 0
+        })
+      }).then(function (r) {
+        return r.text().then(function (t) { return { ok: r.ok, status: r.status, t: t }; });
+      }).then(function (res) {
+        if (res.ok) {
+          var j = null; try { j = JSON.parse(res.t); } catch (e) {}
+          var txt = (((j || {}).choices || [])[0] || {}).message;
+          txt = txt && txt.content ? txt.content.slice(0, 20) : "已连通";
+          msg("✓ 连接成功，模型回了：" + txt);
+        } else {
+          var j2 = null; try { j2 = JSON.parse(res.t); } catch (e) {}
+          var em = (j2 && j2.error && (j2.error.message || j2.error.code)) || res.t.slice(0, 200);
+          msg("✗ HTTP " + res.status + "：" + em, true);
+        }
+      }).catch(function (e) {
+        msg("✗ 连不上：" + e.message + "（检查网络，或接口地址是否写全）", true);
+      });
+    });
+
     if ($("ocrPresetDS")) $("ocrPresetDS").addEventListener("click", function () { applyPreset("DS"); });
     if ($("ocrPresetGLM")) $("ocrPresetGLM").addEventListener("click", function () { applyPreset("GLM"); });
 
