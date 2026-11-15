@@ -2703,18 +2703,39 @@
     }
     // 翼轴：1 号位技能获得迅捷（传动只影响威力位置，这里只取先手）
     if (/1号位技能获得迅捷/.test(d) && (state[side].moves || [])[0] === sk.n) return true;
+    // 飓风：本精灵的技能，若队友中有翼系精灵「携带了同一个技能」且技能耗能在范围内，
+    //        则本技能获得迅捷（按队友顺序找第一个满足的）
     if (/其他翼系精灵携带相同技能[^。]*迅捷/.test(d)) {
-      var mates = (state[side].slots || []).filter(function (n) {
-        var q = PETS.filter(function (x) { return x.n === n; })[0];
-        return q && (q.el === "翼" || q.el2 === "翼") && n !== (pet || {}).n;
-      });
-      return mates.some(function (n) {
-        var q = PETS.filter(function (x) { return x.n === n; })[0];
-        return q && (state[side].moves || []).indexOf(sk.n) >= 0;
-      });
+      // 描述里可能写了耗能范围，例如「耗能不超过4」「耗能小于等于5」
+      var cr = /耗能(?:不超过|不高于|小于等于|≤|<=|小于|低于)\s*(\d+)/.exec(d);
+      var cap = cr ? Number(cr[1]) : null;
+      if (cap !== null && sk.c != null && Number(sk.c) > cap) return false;
+
+      var own = (pet || {}).n;
+      var st = state[side] || {};
+      var mates = (st.slots || []);
+      var profs = st.slotProfiles || {};
+      for (var mi = 0; mi < mates.length; mi++) {
+        var nm = mates[mi];
+        if (!nm || nm === own) continue;
+        var q = PETS.filter(function (x) { return x.n === nm; })[0];
+        if (!q || (q.el !== "翼" && q.el2 !== "翼")) continue;
+        // 该队友的配招：优先取存档，其次取正在编辑的那只
+        var mv = (profs[mi] && profs[mi].moves) || (mi === st.active ? st.moves : null) || [];
+        if (mv.indexOf(sk.n) >= 0) return true;
+      }
+      return false;
     }
     return false;
   }
+
+  // 测试入口：检查某只精灵的技能是否因特性获得迅捷
+  window.__testTraitSwift = function (side, petName, skillName) {
+    var pet = PETS.filter(function (x) { return x.n === petName; })[0];
+    var sk = skillByName(skillName);
+    if (!pet || !sk) return "找不到精灵或技能";
+    return traitSwift(side || "mine", pet, sk);
+  };
 
   // 速度修正：减速印记 速度-10/层，加速印记 +10/层
   function speedWithMarks(side) {
@@ -6594,7 +6615,10 @@
             "3. 看不清的字段写 null，不要猜",
             "",
             "输出格式：",
-            "{\"mine\":{\"pet\":\"\",\"hp\":0,\"hpPct\":0,\"maxHp\":0,\"energy\":0,\"moves\":[\"\",\"\",\"\",\"\"]},\"foe\":{同上}}"
+            "{\"mine\":{\"pet\":\"\",\"hp\":0,\"hpPct\":0,\"maxHp\":0,\"energy\":0,\"moves\":[\"\",\"\",\"\",\"\"]},\"foe\":{同上}}",
+            "",
+            "【如果是队伍/编队截图】（一屏列出多只精灵，每只有名字、性格、个体资质、4 个技能），改用下面的格式，最多 6 只，按图从左到右、从上到下：",
+            "{\"team\":[{\"pet\":\"精灵名\",\"nature\":\"性格（如 保守/胆小，看不出来填 null）\",\"ivs\":[\"资质加的属性，如 攻击、速度\"],\"moves\":[\"技能1\",\"技能2\",\"技能3\",\"技能4\"]}]}"
           ].join("\n");
           fetch(cfg.ep, {
             method: "POST",
@@ -6626,6 +6650,10 @@
             }
             var data = parseJsonFrom(txt);
             if (!data) return resolve({ ok: false, msg: "模型没按格式回 JSON：" + txt.slice(0, 100) });
+            // 队伍截图：识别结果里带 team 数组
+            if (Array.isArray(data.team) && data.team.length) {
+              return resolve({ ok: true, team: data.team, notes: [] });
+            }
             var rec = null;
             try { rec = reconcile(data); } catch (e) { rec = { data: data, notes: [] }; }
             resolve({ ok: true, data: rec.data, notes: rec.notes });
@@ -6783,6 +6811,19 @@
       function row(label, v) {
         return "<div class='occ-row'><span class='occ-k'>" + label + "</span><b>" + (v == null || v === "" ? "—" : v) + "</b></div>";
       }
+      function teamBlock(list) {
+        var rows = list.map(function (it, i) {
+          var mv = (it.moves || []).filter(Boolean).join(" / ") || "—";
+          var iv = (it.ivs || []).join("、") || "—";
+          return "<div class='occ-sec'>" +
+            "<div class='occ-t'>" + (i + 1) + ". " + (it.pet || "未识别") + "</div>" +
+            "<div class='occ-row'><span class='occ-k'>性格</span><b>" + (it.nature || "—") + "</b></div>" +
+            "<div class='occ-row'><span class='occ-k'>个体资质</span><b>" + iv + "</b></div>" +
+            "<div class='occ-row'><span class='occ-k'>招式</span><b>" + mv + "</b></div>" +
+            "</div>";
+        }).join("");
+        return "<div class='occ-sec' style='background:#eef4ff;border-color:#cfdcf7'><div class='occ-t'>识别到队伍 " + list.length + " 只（导入我方）</div></div>" + rows;
+      }
       function sideBlock(side, title) {
         var o = d[side];
         if (!o) return "<div class='occ-sec'><div class='occ-t'>" + title + "</div><div class='occ-row'><span class='occ-k'>未识别</span></div></div>";
@@ -6795,13 +6836,14 @@
           row("招式", (o.moves || []).filter(Boolean).join(" / ") || null) +
           "</div>";
       }
+      var isTeam = !!(rec.team && rec.team.length);
       box.innerHTML =
         "<div class='occ-box'>" +
           "<div class='occ-head'><b>识别结果核对</b><button type='button' class='occ-x'>×</button></div>" +
           "<p class='occ-hint'>" + (fileName ? fileName + " · " : "") + "确认无误再应用；不对就取消，手动改。</p>" +
-          sideBlock("mine", "我方") + sideBlock("foe", "对手") +
+          (isTeam ? teamBlock(rec.team) : (sideBlock("mine", "我方") + sideBlock("foe", "对手"))) +
           (rec.notes.length ? "<div class='occ-notes'>已校正：" + rec.notes.slice(0, 8).join("；") + "</div>" : "") +
-          "<div class='occ-btns'><button type='button' class='tbtn' data-ok='1'>应用到计算器</button>" +
+          "<div class='occ-btns'><button type='button' class='tbtn' data-ok='1'>" + (isTeam ? "导入我方队伍" : "应用到计算器") + "</button>" +
           "<button type='button' class='tbtn ghost' data-cancel='1'>取消</button></div>" +
         "</div>";
       document.body.appendChild(box);
@@ -6809,8 +6851,15 @@
       box.querySelector("[data-cancel]").onclick = function () { box.remove(); };
       box.onclick = function (e) { if (e.target === box) box.remove(); };
       box.querySelector("[data-ok]").onclick = function () {
-        applyOcr(d);
-        showMsg("已应用 " + (fileName || "") + " 的识别结果");
+        if (isTeam) {
+          var r = applyTeam(rec.team);
+          var t = "已导入 " + r.n + " 只到「我方」";
+          if (r.skipped && r.skipped.length) t += "；未识别：" + r.skipped.join("、");
+          showMsg(t);
+        } else {
+          applyOcr(d);
+          showMsg("已应用 " + (fileName || ""));
+        }
         box.remove();
       };
     }
@@ -6822,14 +6871,77 @@
       return { data: rec.data, notes: rec.notes };
     };
     window.__ocrPreview = function (json, name) {
-      var rec = window.__ocrSelftest(json);
-      showOcrPreview(rec, name || "测试");
+      var d = typeof json === "string" ? JSON.parse(json) : json;
+      if (d && Array.isArray(d.team)) {
+        showOcrPreview({ team: d.team, notes: [] }, name || "测试");
+      } else {
+        showOcrPreview(window.__ocrSelftest(d), name || "测试");
+      }
       return true;
     };
 
     function showMsg(t) {
       var m = $("ocrMsg");
       if (m) { m.textContent = t; m.style.color = ""; }
+    }
+
+    /** 队伍截图 → 写入我方 6 个格子（名字/性格/资质/招式） */
+    function applyTeam(list) {
+      var s = state.mine;
+      s.slots = s.slots || ["", "", "", "", "", ""];
+      s.slotProfiles = s.slotProfiles || {};
+      var NATURES = (window.NATURES || []);
+      var n = 0;
+      var skipped = [];
+      list.slice(0, 6).forEach(function (it, i) {
+        var nm = it && it.pet ? closestName(it.pet, PET_NAMES) : null;
+        if (!nm) {
+          // 精灵库里没有这个名字：留空，等用户手动补，不要写错名字
+          s.slots[i] = "";
+          delete s.slotProfiles[i];
+          skipped.push(it && it.pet ? it.pet : "（空）");
+          return;
+        }
+        s.slots[i] = nm.name;
+
+        // 招式校正
+        var pool = SKILL_NAMES;
+        try {
+          var ls = learnsetOf(nm.name);
+          if (ls && ls.s && ls.s.length) pool = ls.s;
+        } catch (e) {}
+        var mv = ["", "", "", ""];
+        (it.moves || []).slice(0, 4).forEach(function (raw, k) {
+          if (!raw) return;
+          var m = closestName(raw, pool) || closestName(raw, SKILL_NAMES);
+          if (m) mv[k] = m.name;
+        });
+
+        // 性格校正（NATURES 若是对象取 key）
+        var nat = "";
+        if (it.nature) {
+          var nk = Array.isArray(NATURES) ? NATURES.map(function (x) { return x.n || x; }) : Object.keys(NATURES || {});
+          var hit = closestName(it.nature, nk);
+          if (hit) nat = hit.name;
+        }
+
+        s.slotProfiles[i] = { moves: mv, nature: nat };
+        n++;
+      });
+      // 清掉多余的格子
+      for (var j = n; j < 6; j++) {
+        s.slots[j] = "";
+        delete s.slotProfiles[j];
+      }
+      // 让 1 号位上到当前
+      s.active = 0;
+      try {
+        var first = s.slotProfiles[0];
+        if (first) { s.moves = first.moves.slice(); s.nature = first.nature; }
+      } catch (e) {}
+
+      save(); buildMoves("mine"); buildMoves("foe"); fillMoveSelects(); renderAll();
+      return { n: n, skipped: skipped };
     }
 
     function applyOcr(d) {
