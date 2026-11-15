@@ -398,7 +398,15 @@ body.df-open{ overflow:hidden; }
       <button type="button" class="tbtn ghost" id="ocrPresetGLM">用智谱</button>
     </div>
     <label class="field"><span>接口地址</span><input id="ocrEndpoint" placeholder="https://api.deepseek.com/chat/completions"></label>
-    <label class="field"><span>模型</span><input id="ocrModel" placeholder="deepseek-flash"></label>
+    <label class="field"><span>模型</span>
+      <select id="ocrModelSel" style="margin-bottom:6px">
+        <option value="deepseek-flash">deepseek-flash（支持图片，推荐）</option>
+        <option value="deepseek-v4-pro">deepseek-v4-pro</option>
+        <option value="glm-4v-flash">glm-4v-flash（智谱）</option>
+        <option value="__custom">其他（手动填）</option>
+      </select>
+      <input id="ocrModel" placeholder="deepseek-flash" style="margin-top:0">
+    </label>
     <label class="field"><span>API Key</span><input id="ocrKey" type="password" placeholder="sk-..."></label>
     <p class="hint" id="ocrHelp">DeepSeek：去 platform.deepseek.com 建 Key，模型填 <code>deepseek-flash</code>（旧名 deepseek-chat 不支持图片）。</p>
     <label class="field"><span>截图</span><input id="ocrFile" type="file" accept="image/*" multiple></label>

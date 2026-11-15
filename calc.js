@@ -6473,8 +6473,21 @@
       $("ocrEndpoint").value = p.ep;
       $("ocrModel").value = p.model;
       if ($("ocrHelp")) $("ocrHelp").textContent = p.help;
+      if ($("ocrModelSel") && p.model) $("ocrModelSel").value = p.model;
       try { msg("已填入 " + p.model + "，只需再填 API Key"); } catch (e) {}
     }
+    // 把用户可能填的模型名纠正成接口认的
+    function normalizeModel(ep, model) {
+      var m = String(model || "").trim();
+      if (!/deepseek/i.test(ep || "")) return m;
+      var low = m.toLowerCase();
+      if (low === "deepseek-flash" || low === "deepseek-v4-pro") return low;
+      if (/flash|vision|vl|image/.test(low)) return "deepseek-flash";
+      if (/pro/.test(low)) return "deepseek-v4-pro";
+      if (/chat|reasoner|r1/.test(low)) return "deepseek-chat";   // 会提示不支持图片
+      return m;
+    }
+
     // 测试连接：只发一句话，确认地址/模型/Key 是否可用
     if ($("ocrTest")) $("ocrTest").addEventListener("click", function () {
       var ep = ($("ocrEndpoint").value || "").trim();
@@ -6482,6 +6495,8 @@
       var key = ($("ocrKey").value || "").trim().replace(/^Bearer\s+/i, "");
       if (!ep || !model || !key) return msg("地址、模型、Key 三项都要填", true);
       if (/^https?:\/\/[^/]+\/?$/.test(ep)) ep = ep.replace(/\/$/, "") + "/chat/completions";
+      var fm2 = normalizeModel(ep, model);
+      if (fm2 !== model) { $("ocrModel").value = fm2; model = fm2; if (typeof syncModelSel === "function") syncModelSel(); }
       msg("测试中…");
       fetch(ep, {
         method: "POST",
@@ -6509,11 +6524,28 @@
       });
     });
 
-    if ($("ocrPresetDS")) $("ocrPresetDS").addEventListener("click", function () { applyPreset("DS"); });
-    if ($("ocrPresetGLM")) $("ocrPresetGLM").addEventListener("click", function () { applyPreset("GLM"); });
+    // 模型下拉 ↔ 输入框联动
+    function syncModelSel() {
+      var sel = $("ocrModelSel"), inp = $("ocrModel");
+      if (!sel || !inp) return;
+      var known = ["deepseek-flash", "deepseek-v4-pro", "glm-4v-flash"];
+      if (known.indexOf(inp.value) >= 0) sel.value = inp.value;
+      else sel.value = "__custom";
+    }
+    if ($("ocrModelSel")) $("ocrModelSel").addEventListener("change", function () {
+      var v = $("ocrModelSel").value;
+      if (v !== "__custom") $("ocrModel").value = v;
+      else $("ocrModel").focus();
+    });
+
+    if ($("ocrPresetDS")) $("ocrPresetDS").addEventListener("click", function () { applyPreset("DS"); syncModelSel(); });
+    if ($("ocrPresetGLM")) $("ocrPresetGLM").addEventListener("click", function () { applyPreset("GLM"); syncModelSel(); });
 
     $("ocrClose").addEventListener("click", function () { modal.hidden = true; });
-    if ($("ocrOpen")) $("ocrOpen").addEventListener("click", function () { modal.hidden = false; });
+    if ($("ocrOpen")) $("ocrOpen").addEventListener("click", function () {
+      modal.hidden = false;
+      if (typeof syncModelSel === "function") syncModelSel();
+    });
 
     function msg(t, bad) {
       var m = $("ocrMsg");
@@ -6597,6 +6629,13 @@
       if (!ep || !model) return msg("点上面的「用 DeepSeek」一键填好，再填 Key", true);
       // 少写路径时自动补全
       if (/^https?:\/\/[^/]+\/?$/.test(ep)) ep = ep.replace(/\/$/, "") + "/chat/completions";
+      var fixedModel = normalizeModel(ep, model);
+      if (fixedModel !== model) {
+        $("ocrModel").value = fixedModel;
+        if (typeof syncModelSel === "function") syncModelSel();
+        msg("模型名已自动改成 " + fixedModel);
+      }
+      model = fixedModel;
       if (/deepseek/i.test(ep) && /deepseek-chat|deepseek-reasoner/i.test(model)) {
         return msg("deepseek-chat 不支持图片，模型请改成 deepseek-flash", true);
       }
