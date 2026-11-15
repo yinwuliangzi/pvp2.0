@@ -6577,8 +6577,25 @@
         var rd = new FileReader();
         rd.onload = function () {
           var b64 = String(rd.result).split(",")[1];
-          var prompt = "这是《洛克王国：世界》对战截图。请只输出 JSON，不要解释：" +
-            "{\"mine\":{\"hp\":数字,\"maxHp\":数字,\"energy\":数字,\"moves\":[技能名数组]},\"foe\":{同上}}";
+          var prompt = [
+            "这是《洛克王国：世界》的对战/队伍截图。请仔细看图，只输出一个 JSON，不要任何解释文字。",
+            "",
+            "图中左侧或上方是我方，右侧或下方是对手（若只有一方，另一方字段填 null）。",
+            "需要读出的字段：",
+            "- pet：精灵名（照抄图上的中文名，看不出来填 null）",
+            "- hp：当前血量数字；图上只有血条没有数字时，按血条长度估算百分比并写 \"hpPct\"",
+            "- maxHp：最大血量（看不出来填 null）",
+            "- energy：当前能量点数（没有就填 null）",
+            "- moves：该精灵的 4 个技能名（照抄中文，看不清的写 null，顺序按图从左到右）",
+            "",
+            "要求：",
+            "1. 严格照抄图上文字，不要自己编造精灵名或技能名",
+            "2. 数字只写数字，不要带单位",
+            "3. 看不清的字段写 null，不要猜",
+            "",
+            "输出格式：",
+            "{\"mine\":{\"pet\":\"\",\"hp\":0,\"hpPct\":0,\"maxHp\":0,\"energy\":0,\"moves\":[\"\",\"\",\"\",\"\"]},\"foe\":{同上}}"
+          ].join("\n");
           fetch(cfg.ep, {
             method: "POST",
             headers: { "Content-Type": "application/json", Authorization: "Bearer " + cfg.key },
@@ -6609,8 +6626,9 @@
             }
             var data = parseJsonFrom(txt);
             if (!data) return resolve({ ok: false, msg: "模型没按格式回 JSON：" + txt.slice(0, 100) });
-            try { applyOcr(data); pushSnapshot(file.name); } catch (e) {}
-            resolve({ ok: true, data: data });
+            var rec = null;
+            try { rec = reconcile(data); } catch (e) { rec = { data: data, notes: [] }; }
+            resolve({ ok: true, data: rec.data, notes: rec.notes });
           }).catch(function (e) {
             resolve({ ok: false, msg: "请求失败：" + e.message });
           });
@@ -6642,11 +6660,12 @@
       try { localStorage.setItem(KEY, JSON.stringify({ endpoint: ep, model: model, key: key })); } catch (e) {}
       var cfg = { ep: ep, model: model, key: key };
       var prog = $("ocrProgress");
-      var lines = [], okCount = 0, failCount = 0;
+      var lines = [], okCount = 0, failCount = 0, lastResults = [];
       msg("批量识别中… 0/" + files.length);
       (function next(i) {
         if (i >= files.length) {
           msg("完成：成功 " + okCount + " 张，失败 " + failCount + " 张");
+          if (lastResults.length) showOcrPreview(lastResults[lastResults.length - 1], lastResults[lastResults.length - 1].name);
           return;
         }
         var f = files[i];
@@ -6654,8 +6673,10 @@
         runOneOcr(f, cfg).then(function (res) {
           if (res.ok) {
             okCount++;
+            lastResults.push({ name: f.name, data: res.data, notes: res.notes || [] });
             var m1 = res.data.mine || {}, f1 = res.data.foe || {};
-            lines.push("✅ " + f.name + "：我 " + (m1.hp ?? "?") + " / 敌 " + (f1.hp ?? "?"));
+            lines.push("✅ " + f.name + "：" + (m1.pet || "?") + " " + (m1.hp ?? (m1.hpPct != null ? "约" + m1.hpPct + "%" : "?")) +
+                       " / " + (f1.pet || "?") + " " + (f1.hp ?? (f1.hpPct != null ? "约" + f1.hpPct + "%" : "?")));
           } else {
             failCount++;
             lines.push("❌ " + f.name + "：" + (res.msg || "失败"));
@@ -6666,14 +6687,178 @@
       })(0);
     });
 
+    // ===== 用真实数据校正模型读出的名字 =====
+    function editDist(a, b) {
+      a = String(a); b = String(b);
+      var m = a.length, n = b.length;
+      if (!m) return n; if (!n) return m;
+      var prev = [], cur = [], i, j;
+      for (j = 0; j <= n; j++) prev[j] = j;
+      for (i = 1; i <= m; i++) {
+        cur[0] = i;
+        for (j = 1; j <= n; j++) {
+          cur[j] = Math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + (a.charAt(i - 1) === b.charAt(j - 1) ? 0 : 1));
+        }
+        prev = cur.slice();
+      }
+      return prev[n];
+    }
+
+    function closestName(input, pool) {
+      var q = String(input || "").trim();
+      if (!q) return null;
+      if (pool.indexOf(q) >= 0) return { name: q, exact: true, dist: 0 };
+      var best = null;
+      for (var i = 0; i < pool.length; i++) {
+        var d = editDist(q, pool[i]);
+        var lim = Math.max(1, Math.floor(Math.min(q.length, pool[i].length) / 4));
+        if (d <= lim && (!best || d < best.dist)) best = { name: pool[i], exact: false, dist: d };
+      }
+      return best;
+    }
+
+    var PET_NAMES = (window.PETS || []).map(function (p) { return p.n; });
+    var SKILL_NAMES = (window.SKILLS || []).map(function (s) { return s.n; });
+
+    /** 把模型输出对齐到真实数据，返回 {data, notes} */
+    function reconcile(d) {
+      var notes = [];
+      var out = { mine: null, foe: null };
+      ["mine", "foe"].forEach(function (side) {
+        var x = d[side];
+        if (!x) return;
+        var o = {
+          pet: null, hp: null, hpPct: null, maxHp: null, energy: null, moves: []
+        };
+
+        // 精灵名
+        if (x.pet) {
+          var pm = closestName(x.pet, PET_NAMES);
+          if (pm) {
+            o.pet = pm.name;
+            if (!pm.exact) notes.push(side === "mine" ? "我方" : "对手" + "：" + x.pet + " → " + pm.name);
+          } else {
+            notes.push((side === "mine" ? "我方" : "对手") + "：" + x.pet + " 不在精灵库，已忽略");
+          }
+        }
+
+        // 血量
+        var hp = Number(x.hp), pct = Number(x.hpPct), maxHp = Number(x.maxHp);
+        if (Number.isFinite(hp) && hp > 0) o.hp = hp;
+        if (Number.isFinite(pct) && pct > 0 && pct <= 100) o.hpPct = pct;
+        if (Number.isFinite(maxHp) && maxHp > 0) o.maxHp = maxHp;
+        if (Number.isFinite(Number(x.energy)) && Number(x.energy) >= 0) o.energy = Number(x.energy);
+
+        // 招式：先用该精灵的可学招式池校正，再退回全集
+        var pool = SKILL_NAMES;
+        if (o.pet) {
+          try {
+            var ls = learnsetOf(o.pet);
+            if (ls && ls.s && ls.s.length) pool = ls.s;
+          } catch (e) {}
+        }
+        var mv = Array.isArray(x.moves) ? x.moves : [];
+        mv.slice(0, 4).forEach(function (raw) {
+          if (!raw) { o.moves.push(""); return; }
+          var m = closestName(raw, pool) || closestName(raw, SKILL_NAMES);
+          if (m) {
+            o.moves.push(m.name);
+            if (!m.exact) notes.push(raw + " → " + m.name);
+          } else {
+            o.moves.push("");
+            notes.push(raw + " 不在技能库，已清空");
+          }
+        });
+        while (o.moves.length < 4) o.moves.push("");
+        out[side] = o;
+      });
+      return { data: out, notes: notes };
+    }
+
+    /** 预览确认后才写入 */
+    function showOcrPreview(rec, fileName) {
+      var d = rec.data;
+      var box = document.createElement("div");
+      box.className = "occ-mask";
+      function row(label, v) {
+        return "<div class='occ-row'><span class='occ-k'>" + label + "</span><b>" + (v == null || v === "" ? "—" : v) + "</b></div>";
+      }
+      function sideBlock(side, title) {
+        var o = d[side];
+        if (!o) return "<div class='occ-sec'><div class='occ-t'>" + title + "</div><div class='occ-row'><span class='occ-k'>未识别</span></div></div>";
+        var hpTxt = o.hp != null ? o.hp : (o.hpPct != null ? "约 " + o.hpPct + "%" : null);
+        return "<div class='occ-sec'><div class='occ-t'>" + title + "</div>" +
+          row("精灵", o.pet) +
+          row("血量", hpTxt) +
+          row("最大血量", o.maxHp) +
+          row("能量", o.energy) +
+          row("招式", (o.moves || []).filter(Boolean).join(" / ") || null) +
+          "</div>";
+      }
+      box.innerHTML =
+        "<div class='occ-box'>" +
+          "<div class='occ-head'><b>识别结果核对</b><button type='button' class='occ-x'>×</button></div>" +
+          "<p class='occ-hint'>" + (fileName ? fileName + " · " : "") + "确认无误再应用；不对就取消，手动改。</p>" +
+          sideBlock("mine", "我方") + sideBlock("foe", "对手") +
+          (rec.notes.length ? "<div class='occ-notes'>已校正：" + rec.notes.slice(0, 8).join("；") + "</div>" : "") +
+          "<div class='occ-btns'><button type='button' class='tbtn' data-ok='1'>应用到计算器</button>" +
+          "<button type='button' class='tbtn ghost' data-cancel='1'>取消</button></div>" +
+        "</div>";
+      document.body.appendChild(box);
+      box.querySelector(".occ-x").onclick = function () { box.remove(); };
+      box.querySelector("[data-cancel]").onclick = function () { box.remove(); };
+      box.onclick = function (e) { if (e.target === box) box.remove(); };
+      box.querySelector("[data-ok]").onclick = function () {
+        applyOcr(d);
+        showMsg("已应用 " + (fileName || "") + " 的识别结果");
+        box.remove();
+      };
+    }
+
+    // 测试用入口（不影响正常流程）
+    window.__ocrSelftest = function (json) {
+      var d = typeof json === "string" ? JSON.parse(json) : json;
+      var rec = reconcile(d);
+      return { data: rec.data, notes: rec.notes };
+    };
+    window.__ocrPreview = function (json, name) {
+      var rec = window.__ocrSelftest(json);
+      showOcrPreview(rec, name || "测试");
+      return true;
+    };
+
+    function showMsg(t) {
+      var m = $("ocrMsg");
+      if (m) { m.textContent = t; m.style.color = ""; }
+    }
+
     function applyOcr(d) {
       ["mine", "foe"].forEach(function (side) {
-        var x = d[side] || {};
-        if (Number.isFinite(Number(x.hp))) state[side].hp = Number(x.hp);
-        if (Number.isFinite(Number(x.energy))) state[side].energy = Number(x.energy);
+        var x = (d && d[side]) || null;
+        if (!x) return;
+        if (x.pet && byName(x.pet)) {
+          var s = state[side];
+          if (s.slots && s.slots.length) {
+            s.slots[s.active] = x.pet;
+            s.slotProfiles = s.slotProfiles || {};
+            delete s.slotProfiles[s.active];
+          }
+        }
+        if (Number.isFinite(Number(x.hp)) && Number(x.hp) > 0) {
+          state[side].hp = Number(x.hp);
+          state[side].hp0 = Math.max(Number(x.hp), Number(x.maxHp) || Number(x.hp));
+        } else if (Number.isFinite(Number(x.hpPct)) && Number(x.hpPct) > 0) {
+          try {
+            var st = sideStats(side);
+            var max = Number(x.maxHp) > 0 ? Number(x.maxHp) : st.stats.hp;
+            state[side].hp = Math.max(1, Math.round(max * Number(x.hpPct) / 100));
+            state[side].hp0 = max;
+          } catch (e) {}
+        }
+        if (Number.isFinite(Number(x.energy)) && Number(x.energy) >= 0) state[side].energy = Number(x.energy);
         if (Array.isArray(x.moves) && x.moves.length) {
           x.moves.slice(0, 4).forEach(function (n, i) {
-            if (skillByName(n)) state[side].moves[i] = n;
+            if (n && skillByName(n)) state[side].moves[i] = n;
           });
         }
       });
