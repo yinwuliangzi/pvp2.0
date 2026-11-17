@@ -158,6 +158,41 @@
     return out.join("\n");
   }
 
+  /* ============ 自定义脚本（默认关闭） ============ */
+  var SCRIPT_KEY = "luoke.miao.script";
+
+  function scriptEnabled() {
+    try { return localStorage.getItem(SCRIPT_KEY) === "1"; } catch (e) { return false; }
+  }
+  function setScriptEnabled(on) {
+    try {
+      if (on) localStorage.setItem(SCRIPT_KEY, "1");
+      else localStorage.removeItem(SCRIPT_KEY);
+    } catch (e) {}
+  }
+
+  /** 运行一段脚本。默认关闭；开启后每次执行都会先弹确认框 */
+  function runScript(code) {
+    if (!scriptEnabled()) {
+      return "⚠️ 自定义脚本未开启。\n\n在面板右上角点「⚙」→ 打开「允许自定义脚本」，我会再问你一次才执行。";
+    }
+    var preview = String(code).trim();
+    if (preview.length > 400) preview = preview.slice(0, 400) + "…";
+    var ok = window.confirm(
+      "喵喵要执行以下脚本：\n\n" + preview +
+      "\n\n脚本能读取和修改页面上的任何数据。确定执行吗？"
+    );
+    if (!ok) return "已取消。";
+    try {
+      // 用户显式授权后才走 Function；这是唯一一处动态执行
+      var fn = new Function("Miao", "MiaoBridge", "state", "PETS", "SKILLS", code);
+      var ret = fn(window.Miao, window.MiaoBridge, (window.__lsState ? window.__lsState() : null), window.PETS, window.SKILLS);
+      return "✅ 已执行\n返回值：" + (typeof ret === "undefined" ? "（无）" : JSON.stringify(ret).slice(0, 300));
+    } catch (e) {
+      return "❌ 执行出错：" + e.message;
+    }
+  }
+
   /* ============ 阵容感知与操作 ============ */
   function bridge() { return window.MiaoBridge || null; }
 
@@ -274,6 +309,10 @@
       return currentPetAnswer(/对面|对方|敌方/.test(text) ? "foe" : "mine");
     }
 
+    // 自定义脚本：以 js: 或 > 开头
+    var sm = /^(?:js:|>|运行)\s*([\s\S]+)$/.exec(text);
+    if (sm) return runScript(sm[1]);
+
     // 执行操作
     var act = doAction(text);
     if (act) return "✅ " + act;
@@ -379,7 +418,14 @@
       '<div class="mm-head">' +
         '<span class="mm-title">🐱 喵喵</span>' +
         '<span class="mm-mode" id="mmMode">离线</span>' +
+        '<button type="button" class="mm-gear" id="mmGear" title="设置">⚙</button>' +
         '<button type="button" class="mm-x" id="mmClose">×</button>' +
+      '</div>' +
+      '<div class="mm-set" id="mmSet" hidden>' +
+        '<label><input type="checkbox" id="mmScriptChk"> 允许自定义脚本（js: 开头）</label>' +
+        '<div class="mm-warn">开启后，我发给喵喵的 js: 命令会真的在页面里运行，能读写任何数据。每次执行前都会再确认一次。</div>' +
+      '</div>' +
+      '<div style="display:none">'
       '</div>' +
       '<div class="mm-list" id="mmList"></div>' +
       '<div class="mm-foot">' +
@@ -392,6 +438,24 @@
     inputEl = box.querySelector("#mmInput");
 
     box.querySelector("#mmClose").onclick = function () { box.style.display = "none"; };
+
+    var setBox = box.querySelector("#mmSet");
+    var chk = box.querySelector("#mmScriptChk");
+    if (chk) {
+      chk.checked = scriptEnabled();
+      chk.onchange = function () {
+        if (chk.checked) {
+          var ok = window.confirm("开启自定义脚本后，发 js: 开头的命令会真的执行页面代码。\n攻击者拿到这个页面就能读你的所有数据。\n\n确定开启吗？");
+          if (!ok) { chk.checked = false; return; }
+          setScriptEnabled(true);
+        } else {
+          setScriptEnabled(false);
+        }
+      };
+    }
+    box.querySelector("#mmGear").onclick = function () {
+      setBox.hidden = !setBox.hidden;
+    };
     box.querySelector("#mmSend").onclick = send;
     inputEl.addEventListener("keydown", function (e) { if (e.key === "Enter") send(); });
 

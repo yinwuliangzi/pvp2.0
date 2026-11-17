@@ -582,3 +582,9 @@ body.embed-mode .tabbar { display:none !important; }
 @media(max-width:700px){
   #miaomiao{right:8px;left:8px;bottom:8px;width:auto;height:64vh}
 }
+
+#miaomiao .mm-gear{border:0;background:none;font-size:15px;color:#8c8677;cursor:pointer;line-height:1}
+#miaomiao .mm-set{padding:10px 12px;background:#fdf6e3;border-bottom:1px solid #ece6d8;font-size:11.5px;color:#6b6455}
+#miaomiao .mm-set label{display:flex;align-items:center;gap:7px;font-weight:700;color:#4a4438;cursor:pointer}
+#miaomiao .mm-set input{width:auto}
+#miaomiao .mm-warn{margin-top:6px;line-height:1.7;color:#a07c2a}
