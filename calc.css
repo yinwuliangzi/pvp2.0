@@ -553,3 +553,32 @@ body.embed-mode .tabbar { display:none !important; }
 .occ-notes{font-size:11px;color:#a07c2a;background:#fdf6e3;border-radius:8px;padding:8px 10px;margin-bottom:10px;line-height:1.7}
 .occ-btns{display:flex;gap:8px}
 .occ-btns .tbtn{flex:1}
+
+
+/* ===== 喵喵对战助手 ===== */
+#miaomiao{position:fixed;right:18px;bottom:86px;width:330px;height:440px;z-index:10050;
+  display:none;flex-direction:column;background:#fffdf7;border:1px solid #ddd6c6;
+  border-radius:14px;box-shadow:0 16px 44px rgba(40,34,20,.28);overflow:hidden}
+#miaomiao .mm-head{display:flex;align-items:center;gap:8px;padding:10px 12px;
+  background:linear-gradient(160deg,#f3ecd9,#efe6d0);border-bottom:1px solid #e3dac4}
+#miaomiao .mm-title{font-size:14px;font-weight:800;color:#2b2a26}
+#miaomiao .mm-mode{margin-left:auto;font-size:10.5px;padding:2px 8px;border-radius:99px;
+  background:#e8e2d2;color:#8c8677}
+#miaomiao .mm-mode.on{background:#d8f0e2;color:#2e7d4f}
+#miaomiao .mm-x{border:0;background:none;font-size:19px;line-height:1;color:#8c8677;cursor:pointer}
+#miaomiao .mm-list{flex:1 1 auto;overflow-y:auto;padding:12px;display:flex;flex-direction:column;gap:9px}
+#miaomiao .mm-msg{max-width:88%;padding:9px 11px;border-radius:11px;font-size:12.5px;line-height:1.75;word-break:break-word}
+#miaomiao .mm-msg.bot{background:#f3efe3;color:#33312a;align-self:flex-start;border-bottom-left-radius:4px}
+#miaomiao .mm-msg.me{background:#3B6EF5;color:#fff;align-self:flex-end;border-bottom-right-radius:4px}
+#miaomiao .mm-foot{display:flex;gap:7px;padding:9px 11px;border-top:1px solid #ece6d8}
+#miaomiao #mmInput{flex:1 1 auto;padding:8px 10px;border:1px solid #ddd6c6;border-radius:9px;
+  font-size:13px;outline:none;background:#fbf8f0;color:#2b2a26}
+#miaomiao #mmSend{padding:0 14px;border:0;border-radius:9px;background:#3B6EF5;color:#fff;
+  font-size:13px;font-weight:700;cursor:pointer}
+#miaomiao .mm-tip{font-size:10px;color:#a9a294;padding:0 12px 9px;line-height:1.6}
+.mm-fab{position:fixed;right:18px;bottom:44px;width:44px;height:44px;border-radius:50%;
+  border:0;background:#3B6EF5;color:#fff;font-size:20px;cursor:pointer;z-index:10049;
+  box-shadow:0 6px 18px rgba(59,110,245,.4)}
+@media(max-width:700px){
+  #miaomiao{right:8px;left:8px;bottom:8px;width:auto;height:64vh}
+}
