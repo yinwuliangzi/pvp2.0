@@ -2095,6 +2095,24 @@
     if ($("meAction") && state.uiAction) $("meAction").value = state.uiAction;
     fillStrategies();
     if ($("doubleMode")) $("doubleMode").value = state.doubles ? "1" : "";
+    // 形态行：只有装备愿力强化时显示
+    var formLine = $("mineFormLine");
+    if (formLine) {
+      var needForm = itemOf("mine") === "resonance";
+      formLine.style.display = needForm ? "" : "none";
+      if ($("mineForm")) $("mineForm").value = state.mine.form || "";
+    }
+    ["mine", "foe"].forEach(function (sd) {
+      var sel = $(sd + "Item");
+      if (sel) sel.value = itemOf(sd);
+      var note = $(sd + "ItemNote");
+      if (note) {
+        var k = itemOf(sd), d = ITEM_DEFS[k] || {};
+        var u = (state[sd].itemUses || {})[k] || 0;
+        var cd = (state[sd].itemCd || {})[k] || 0;
+        note.textContent = d.uses ? ("已用 " + u + "/" + d.uses + (cd > 0 ? " · 冷却 " + cd : "")) : "";
+      }
+    });
     if ($("mineBall")) $("mineBall").value = state.mine.ball || "普通球";
     if ($("foeBall")) $("foeBall").value = state.foe.ball || "普通球";
     if ($("firstThisTurn")) $("firstThisTurn").value = state.firstThisTurn ? "1" : "";
@@ -2214,21 +2232,132 @@
   }
 
   // 道具：进化之力（每场每方 1 次）
-  function useItem(side) {
-    var st = state[side];
-    if (st.itemUsed) return { ok: false, msg: "进化之力已经用过了" };
-    var pet = sidePet(side);
-    var next = evolveOf(pet);
-    if (!next) return { ok: false, msg: pet.n + " 没有可进化的形态" };
-    var before = pet.n;
-    st.slots[st.active] = next.n;
-    var ns = sideStats(side);
-    st.hp = Math.min(ns.stats.hp, st.hp);
-    st.itemUsed = true;
-    autofillMoves(side, true);
-    var leader = /首领/.test(before) || /首领/.test(next.n);
-    return { ok: true, msg: before + " → " + next.n, leader: leader };
+  // ===== 道具（装备类） =====
+  var ITEM_DEFS = {
+    evolve: {
+      n: "进化之力",
+      d: "进化一次，种族值提升；不消耗回合出招。每场 1 次。",
+      uses: 1, cooldown: 0
+    },
+    resonance: {
+      n: "愿力强化",
+      d: "对任意系别血脉的精灵使用：本回合技能栏首个技能替换为【愿力冲击】。每场 2 次，冷却 3 回合。",
+      uses: 2, cooldown: 3
+    },
+    heal: {
+      n: "光合治愈",
+      d: "恢复自身 50% 生命。每场 2 次，冷却 2 回合。",
+      uses: 2, cooldown: 2
+    }
+  };
+
+  /** 取某方当前装备的道具 key */
+  function itemOf(side) {
+    var s = state[side] || {};
+    return s.item || "evolve";
   }
+  function itemState(side) {
+    var s = state[side] || {};
+    s.itemUses = s.itemUses || {};      // { key: 已用次数 }
+    s.itemCd = s.itemCd || {};          // { key: 剩余冷却回合 }
+    return s;
+  }
+
+  /** 愿力冲击：按形态生成对应属性版本 */
+  function wishImpact(side) {
+    var pet = sidePet(side);
+    var form = (state[side] || {}).form || "";
+    var map = { "圣光": "光", "圣水": "水", "圣火": "火", "圣草": "草" };
+    var el = map[form] || (pet ? pet.el : "普通");
+    var base = SKILLS.filter(function (s) { return s.n === "愿力冲击"; })[0];
+    if (!base) return null;
+    return Object.assign({}, base, { e: el, disp: "愿力冲击（" + el + "）" });
+  }
+
+  function useItem(side) {
+    var st = itemState(side);
+    var key = itemOf(side);
+    var def = ITEM_DEFS[key] || ITEM_DEFS.evolve;
+
+    // 次数与冷却
+    var used = Number(st.itemUses[key]) || 0;
+    var cd = Number(st.itemCd[key]) || 0;
+    if (cd > 0) return { ok: false, msg: def.n + " 冷却中（还剩 " + cd + " 回合）" };
+    if (used >= def.uses) return { ok: false, msg: def.n + " 本场已用完（" + def.uses + " 次）" };
+
+    // ---- 进化之力 ----
+    if (key === "evolve") {
+      var pet = sidePet(side);
+      var next = evolveOf(pet);
+      if (!next) return { ok: false, msg: pet.n + " 没有可进化的形态" };
+      var before = pet.n;
+      st.slots[st.active] = next.n;
+      var ns = sideStats(side);
+      st.hp = Math.min(ns.stats.hp, st.hp);
+      st.itemUsed = true;
+      autofillMoves(side, true);
+      var leader = /首领/.test(before) || /首领/.test(next.n);
+      st.itemUses[key] = used + 1;
+      if (def.cooldown) st.itemCd[key] = def.cooldown + 1;
+      return { ok: true, msg: before + " → " + next.n, leader: leader };
+    }
+
+    // ---- 愿力强化：首技能变为愿力冲击（按形态定属性）----
+    if (key === "resonance") {
+      var wi = wishImpact(side);
+      if (!wi) return { ok: false, msg: "找不到愿力冲击的数据" };
+      var old = (st.moves || [])[0] || "（空）";
+      st.moves = (st.moves || ["", "", "", ""]).slice();
+      st.moves[0] = wi.n;
+      st.wishThisTurn = { e: wi.e, name: wi.disp || wi.n };
+      st.itemUses[key] = used + 1;
+      st.itemCd[key] = def.cooldown + 1;
+      return { ok: true, msg: "首技能 " + old + " → 愿力冲击（" + wi.e + "系）" };
+    }
+
+    // ---- 光合治愈：回复 50% 生命 ----
+    if (key === "heal") {
+      var petH = sidePet(side);
+      var max = sideStats(side).stats.hp;
+      var before2 = Number(st.hp) || 0;
+      var heal = Math.round(max * 0.5);
+      st.hp = Math.min(max, before2 + heal);
+      st.itemUses[key] = used + 1;
+      st.itemCd[key] = def.cooldown + 1;
+      return { ok: true, msg: "光合治愈：+" + (st.hp - before2) + " 生命（" + before2 + " → " + st.hp + "）" };
+    }
+
+    return { ok: false, msg: "未知道具" };
+  }
+
+  ["mine", "foe"].forEach(function (sd) {
+    var sel = document.getElementById(sd + "Item");
+    if (!sel) return;
+    sel.addEventListener("change", function () {
+      state[sd].item = sel.value;
+      state[sd].itemUses = state[sd].itemUses || {};
+      state[sd].itemCd = state[sd].itemCd || {};
+      save(); renderAll();
+    });
+  });
+  var formSel = document.getElementById("mineForm");
+  if (formSel) formSel.addEventListener("change", function () {
+    state.mine.form = formSel.value;
+    // 迪莫四形态：切换后首技能变为对应属性的愿力冲击
+    if (formSel.value) {
+      var wi = wishImpact("mine");
+      if (wi) {
+        state.mine.moves = (state.mine.moves || ["", "", "", ""]).slice();
+        state.mine.moves[0] = wi.n;
+        state.mine.wishThisTurn = { e: wi.e, name: wi.disp };
+      }
+    }
+    save(); buildMoves("mine"); fillMoveSelects(); renderAll();
+  });
+
+  // 测试/调试入口
+  window.__useItem = useItem;
+  window.__itemDefs = ITEM_DEFS;
 
   function advanceActive(side) {
     var s = state[side];

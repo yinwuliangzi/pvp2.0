@@ -68,6 +68,18 @@ body.df-open{ overflow:hidden; }
       </div>
       <div class="line"><span class="lbl">属性</span><span id="mineEle">—</span><select id="mineEl2Sel" class="blood-sel" style="display:none;margin-left:8px;font-size:12px"></select></div>
       <div class="line"><span class="lbl">咕噜球</span><select id="mineBall" class="blood-sel"></select></div>
+      <div class="line"><span class="lbl">道具</span><select id="mineItem" class="blood-sel">
+        <option value="evolve">进化之力</option>
+        <option value="resonance">愿力强化</option>
+        <option value="heal">光合治愈</option>
+      </select><span id="mineItemNote" class="blood-note"></span></div>
+      <div class="line" id="mineFormLine" style="display:none"><span class="lbl">形态</span><select id="mineForm" class="blood-sel">
+        <option value="">无</option>
+        <option value="圣光">圣光</option>
+        <option value="圣水">圣水</option>
+        <option value="圣火">圣火</option>
+        <option value="圣草">圣草</option>
+      </select></div>
       <div class="line"><span class="lbl">血脉</span><select id="mineBloodSel" class="blood-sel"></select><span id="mineBlood" class="blood-note"></span><button type="button" class="mini-btn" data-blood="mine">填入招式</button></div>
       <div class="line traitline"><span class="lbl">特性</span><textarea id="mineTrait" rows="2" placeholder="特性描述（可改）"></textarea><button type="button" class="mini-btn" id="mineTraitReset">恢复</button></div>
       <div class="moves" id="mineMoves"></div>
@@ -299,6 +311,11 @@ body.df-open{ overflow:hidden; }
       </div>
       <div class="line"><span class="lbl">属性</span><span id="foeEle">—</span><select id="foeEl2Sel" class="blood-sel" style="display:none;margin-left:8px;font-size:12px"></select></div>
       <div class="line"><span class="lbl">咕噜球</span><select id="foeBall" class="blood-sel"></select></div>
+      <div class="line"><span class="lbl">道具</span><select id="foeItem" class="blood-sel">
+        <option value="evolve">进化之力</option>
+        <option value="resonance">愿力强化</option>
+        <option value="heal">光合治愈</option>
+      </select><span id="foeItemNote" class="blood-note"></span></div>
       <div class="line"><span class="lbl">血脉</span><select id="foeBloodSel" class="blood-sel"></select><span id="foeBlood" class="blood-note"></span><button type="button" class="mini-btn" data-blood="foe">填入招式</button></div>
       <div class="line traitline"><span class="lbl">特性</span><textarea id="foeTrait" rows="2" placeholder="特性描述（可改）"></textarea><button type="button" class="mini-btn" id="foeTraitReset">恢复</button></div>
       <div class="moves" id="foeMoves"></div>
