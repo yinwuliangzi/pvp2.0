@@ -158,6 +158,79 @@
     return out.join("\n");
   }
 
+  /* ============ 阵容感知与操作 ============ */
+  function bridge() { return window.MiaoBridge || null; }
+
+  function teamAnswer() {
+    var b = bridge();
+    if (!b) return "读不到计算器数据（MiaoBridge 未加载）。";
+    var st = b.readState();
+    function line(s, title) {
+      var me = s.slots[s.active];
+      var out = "**" + title + "**（当前 " + (me || "空") + "）\n";
+      s.slots.forEach(function (n, i) {
+        if (!n) return;
+        out += (i === s.active ? "▶ " : "  ") + (i + 1) + ". " + n + "\n";
+      });
+      return out;
+    }
+    var t = line(st.mine, "我方") + "\n" + line(st.foe, "对方");
+    t += "\n当前我方：" + (st.mine.pet || "空") + " 血量 " + st.mine.hp + " 能量 " + st.mine.energy;
+    t += "\n已记录 " + st.turn + " 回合";
+    return t;
+  }
+
+  function currentPetAnswer(which) {
+    var b = bridge();
+    if (!b) return "读不到计算器数据。";
+    var st = b.readState();
+    var s = which === "foe" ? st.foe : st.mine;
+    if (!s.pet) return (which === "foe" ? "对方" : "我方") + "当前格子是空的。";
+    var out = "**" + s.pet + "**（" + (which === "foe" ? "对方" : "我方") + "当前在场）\n";
+    out += "血量 " + s.hp + " · 能量 " + s.energy + " · 魔力 " + s.mana + "\n";
+    out += "等级 " + s.level + " 星级 " + s.star + (s.nature ? " 性格 " + s.nature : "") + "\n";
+    out += "招式：" + (s.moves.filter(Boolean).join(" / ") || "（未配）");
+    return out;
+  }
+
+  function doAction(text) {
+    var b = bridge();
+    if (!b) return null;
+
+    // 换精灵：换第N个 → / 把第N个换成XXX
+    var m1 = /(?:把)?第\s*(\d)\s*(?:个|格|只)?.*?(?:换成|改成|设为)\s*([^\s，,。]+)/.exec(text);
+    if (m1) {
+      var side1 = /对方|敌方|对面/.test(text) ? "foe" : "mine";
+      var r = b.setPet(side1, Number(m1[1]) - 1, m1[2]);
+      return r.msg;
+    }
+    // 给当前精灵配招
+    var m2 = /(?:给|把)?.*?(?:配招|招式|技能)\s*(?:换成|改成|设为|为|是)\s*(.+)/.exec(text);
+    if (m2) {
+      var list = m2[1].split(/[、,，\s和跟]+/).filter(Boolean);
+      var side2 = /对方|敌方|对面/.test(text) ? "foe" : "mine";
+      var r2 = b.setMoves(side2, list);
+      return r2.msg;
+    }
+    // 改数值
+    var m3 = /(?:把)?\s*(?:我方|对方|敌方)?\s*(血量|血|能量|等级|星级|魔力)\s*(?:改成|设为|设为|=|到)\s*(\d+)/.exec(text);
+    if (m3) {
+      var map = { "血量": "hp", "血": "hp", "能量": "energy", "等级": "level", "星级": "star", "魔力": "mana" };
+      var side3 = /对方|敌方|对面/.test(text) ? "foe" : "mine";
+      var r3 = b.setNumeric(side3, map[m3[1]], Number(m3[2]));
+      return r3.msg;
+    }
+    // 切换格子
+    var m4 = /(?:切到|选中|换到)\s*第\s*(\d)\s*(?:个|格|只)/.exec(text);
+    if (m4) {
+      var r4 = b.switchSlot(/对方|敌方|对面/.test(text) ? "foe" : "mine", Number(m4[1]) - 1);
+      return r4.msg;
+    }
+    if (/记录本回合|记一回合|记下这回合/.test(text)) return b.recordTurn().msg;
+    if (/撤销|撤回|上一步/.test(text)) return b.undo().msg;
+    return null;
+  }
+
   /* ============ 意图识别 ============ */
   var INTENT = [
     { k: "compare", re: /(.+?)\s*(?:vs|VS|对|打|和)\s*(.+)/, fn: "compare" },
@@ -192,6 +265,18 @@
   function answerOffline(q) {
     var text = String(q || "").trim();
     if (!text) return "在的，问吧。";
+
+    // 看阵容
+    if (/(?:我|当前|现在).{0,4}(?:阵容|队伍|配的|带了)|阵容|双方|读一下/.test(text) && !/vs|配招|弱点/.test(text)) {
+      return teamAnswer();
+    }
+    if (/(?:当前|现在|我这只|对面这只|对方这只).{0,6}(?:什么|谁|状态)|当前精灵/.test(text)) {
+      return currentPetAnswer(/对面|对方|敌方/.test(text) ? "foe" : "mine");
+    }
+
+    // 执行操作
+    var act = doAction(text);
+    if (act) return "✅ " + act;
 
     // 打招呼
     if (/^(你好|hi|hello|哈喽|在吗)/i.test(text)) {

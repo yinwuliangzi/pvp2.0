@@ -2737,6 +2737,123 @@
     return traitSwift(side || "mine", pet, sk);
   };
 
+  // ===== 给「喵喵」用的受控操作接口 =====
+  // 只暴露明确列出的动作，不接受任意代码
+  window.MiaoBridge = {
+    // --- 读 ---
+    readState: function () {
+      function snap(side) {
+        var s = state[side] || {};
+        return {
+          active: s.active,
+          slots: (s.slots || []).slice(),
+          pet: (s.slots || [])[s.active] || "",
+          hp: s.hp, energy: s.energy, mana: s.mana,
+          level: s.level, star: s.star, iv: JSON.parse(JSON.stringify(s.iv || {})),
+          nature: s.nature || "",
+          moves: (s.moves || []).slice(),
+          status: s.status || ""
+        };
+      }
+      return {
+        mine: snap("mine"),
+        foe: snap("foe"),
+        weather: state.weather || "",
+        turn: (state.history || []).length
+      };
+    },
+    listPets: function () { return PETS.map(function (p) { return p.n; }); },
+    listSkills: function () { return SKILLS.map(function (s) { return s.n; }); },
+
+    // --- 写（全部经校验） ---
+    setPet: function (side, slot, name) {
+      if (side !== "mine" && side !== "foe") return { ok: false, msg: "side 只能是 mine/foe" };
+      if (slot < 0 || slot > 5) return { ok: false, msg: "slot 0-5" };
+      var hit = PETS.filter(function (p) { return p.n === name; })[0] ||
+                PETS.filter(function (p) { return p.n.indexOf(name) >= 0; })[0];
+      if (!hit) return { ok: false, msg: "精灵库里没有「" + name + "」" };
+      var s = state[side];
+      s.slots[slot] = hit.n;
+      s.slotProfiles = s.slotProfiles || {};
+      delete s.slotProfiles[slot];
+      if (slot === s.active) { s.benchKey = null; loadSlotProfile(side, slot); }
+      save(); renderAll();
+      return { ok: true, msg: (side === "mine" ? "我方" : "对方") + " " + (slot + 1) + " 号位 → " + hit.n };
+    },
+    setMoves: function (side, list) {
+      if (side !== "mine" && side !== "foe") return { ok: false, msg: "side 只能是 mine/foe" };
+      if (!Array.isArray(list)) return { ok: false, msg: "list 必须是数组" };
+      var s = state[side], bad = [];
+      var out = ["", "", "", ""];
+      list.slice(0, 4).forEach(function (n, i) {
+        if (!n) return;
+        var sk = SKILLS.filter(function (x) { return x.n === n; })[0] ||
+                 SKILLS.filter(function (x) { return x.n.indexOf(n) >= 0; })[0];
+        if (sk) out[i] = sk.n; else bad.push(n);
+      });
+      s.moves = out;
+      if (s.slotProfiles) s.slotProfiles[s.active] = Object.assign({}, s.slotProfiles[s.active] || {}, { moves: out.slice() });
+      save(); buildMoves(side); fillMoveSelects(); renderAll();
+      return { ok: true, msg: (side === "mine" ? "我方" : "对方") + " 招式已设为 " + out.filter(Boolean).join("、") + (bad.length ? "（未找到：" + bad.join("、") + "）" : "") };
+    },
+    setNumeric: function (side, key, value) {
+      if (side !== "mine" && side !== "foe") return { ok: false, msg: "side 只能是 mine/foe" };
+      var allow = { hp: [0, 9999], energy: [0, 99], mana: [0, 4], level: [1, 100], star: [0, 10], priority: [-9, 9] };
+      if (!allow[key]) return { ok: false, msg: "只支持 " + Object.keys(allow).join("/") };
+      var v = Number(value);
+      if (!isFinite(v)) return { ok: false, msg: "value 不是数字" };
+      v = Math.max(allow[key][0], Math.min(allow[key][1], Math.round(v)));
+      state[side][key] = v;
+      save(); renderAll();
+      return { ok: true, msg: (side === "mine" ? "我方" : "对方") + " " + key + " = " + v };
+    },
+    setNature: function (side, nature) {
+      if (side !== "mine" && side !== "foe") return { ok: false, msg: "side 只能是 mine/foe" };
+      var list = (window.NATURES || []).map(function (x) { return x.n; });
+      if (nature && list.indexOf(nature) < 0) return { ok: false, msg: "性格只能是 " + list.slice(0, 8).join("/") + " 等" };
+      state[side].nature = nature || "";
+      save(); renderAll();
+      return { ok: true, msg: (side === "mine" ? "我方" : "对方") + " 性格 = " + (nature || "无") };
+    },
+    switchSlot: function (side, slot) {
+      if (side !== "mine" && side !== "foe") return { ok: false, msg: "side 只能是 mine/foe" };
+      if (slot < 0 || slot > 5) return { ok: false, msg: "slot 0-5" };
+      var s = state[side];
+      if (s.active !== slot) {
+        saveSlotProfile(side);
+        s.active = slot;
+        loadSlotProfile(side, slot);
+        s.benchKey = null;
+      }
+      save(); renderAll();
+      return { ok: true, msg: "切到 " + (s.slots[slot] || "（空）") };
+    },
+    recordTurn: function () {
+      try { recordTurn(); return { ok: true, msg: "已记录本回合" }; }
+      catch (e) { return { ok: false, msg: e.message }; }
+    },
+    undo: function () {
+      var b = document.getElementById("undoTurn");
+      if (b) { b.click(); return { ok: true, msg: "已撤销一回合" }; }
+      return { ok: false, msg: "没有可撤销的" };
+    },
+    // 存档
+    exportSave: function () { try { return localStorage.getItem(KEY) || ""; } catch (e) { return ""; } },
+    importSave: function (json) {
+      try {
+        var o = JSON.parse(json);
+        if (!o || !o.mine || !o.foe) return { ok: false, msg: "不是有效的存档" };
+        localStorage.setItem(KEY, json);
+        location.reload();
+        return { ok: true, msg: "已导入，页面重载中" };
+      } catch (e) { return { ok: false, msg: "JSON 解析失败" }; }
+    },
+    resetSave: function () {
+      try { localStorage.removeItem(KEY); location.reload(); return { ok: true, msg: "已重置" }; }
+      catch (e) { return { ok: false, msg: e.message }; }
+    }
+  };
+
   // 速度修正：减速印记 速度-10/层，加速印记 +10/层
   function speedWithMarks(side) {
     var base = sideStats(side).stats.spe;
