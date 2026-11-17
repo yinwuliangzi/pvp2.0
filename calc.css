@@ -715,3 +715,29 @@ body.embed-mode .tabbar { display:none !important; }
   #miaomiao .mm-list{padding:14px 12px 8px}
   #miaomiao .mm-msg{font-size:13.5px}
 }
+
+/* ===== 消息内 Markdown ===== */
+#miaomiao .mm-msg p{margin:0 0 8px}
+#miaomiao .mm-msg p:last-child{margin-bottom:0}
+#miaomiao .mm-msg .mm-h{margin:10px 0 6px;font-size:13.5px;font-weight:800;line-height:1.5}
+#miaomiao .mm-msg .mm-h:first-child{margin-top:0}
+#miaomiao .mm-msg h4.mm-h{font-size:13.5px}
+#miaomiao .mm-msg h5.mm-h{font-size:12.5px}
+#miaomiao .mm-msg h6.mm-h{font-size:12px;color:#6B6455}
+#miaomiao .mm-msg .mm-ul,#miaomiao .mm-msg .mm-ol{margin:4px 0 8px;padding-left:18px}
+#miaomiao .mm-msg .mm-ul li,#miaomiao .mm-msg .mm-ol li{margin:3px 0;line-height:1.75}
+#miaomiao .mm-msg .mm-ul{list-style:disc}
+#miaomiao .mm-msg .mm-ol{list-style:decimal}
+#miaomiao .mm-msg .mm-hr{border:0;border-top:1px solid #EDE4D2;margin:10px 0}
+#miaomiao .mm-msg .mm-quote{margin:6px 0;padding:6px 10px;border-left:3px solid #DCEFC0;
+  background:#F7FBEF;border-radius:0 6px 6px 0;color:#5A5445;font-size:12.5px}
+#miaomiao .mm-msg .mm-pre{background:#2E2A22;color:#EFEADF;padding:9px 11px;border-radius:8px;
+  overflow-x:auto;margin:6px 0}
+#miaomiao .mm-msg .mm-pre code{background:none;color:inherit;padding:0;font-size:11.5px}
+#miaomiao .mm-msg.me .mm-pre{background:rgba(0,0,0,.24)}
+#miaomiao .mm-msg.me .mm-ul,#miaomiao .mm-msg.me .mm-ol{color:#fff}
+#miaomiao .mm-msg.me .mm-h{color:#fff}
+
+#miaomiao .mm-caret{display:inline-block;width:6px;height:13px;background:#7CBF2E;
+  margin-left:2px;vertical-align:-2px;animation:mmCaret .9s steps(2) infinite;border-radius:1px}
+@keyframes mmCaret{0%,50%{opacity:1}51%,100%{opacity:0}}

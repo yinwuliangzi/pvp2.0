@@ -110,6 +110,47 @@
     return out.join("\n");
   }
 
+  /** 定位与配队建议（读完能知道这只该怎么用、配什么队友） */
+  function adviceAnswer(pet) {
+    var stats = [["生命", pet.hp], ["物攻", pet.atk], ["物防", pet.def], ["魔攻", pet.ma], ["魔防", pet.md], ["速度", pet.spe]];
+    var sorted = stats.slice().sort(function (a, b) { return b[1] - a[1]; });
+    var worst = sorted[sorted.length - 1];
+    var els = [pet.el, pet.el2].filter(Boolean);
+
+    var out = "## " + pet.n + " 定位（从种族值看）\n\n";
+    sorted.forEach(function (s) {
+      var n = s[0], v = s[1];
+      if (n === "速度" && v >= 110) out += "- **速度 " + v + "**：队里偏快，基本能先手\n";
+      else if (n === "速度" && v <= 70) out += "- **速度 " + v + "**：偏慢，别指望先手\n";
+      else if (n === "魔防" && v <= 85) out += "- **魔防 " + v + "**：明显短板，遇到特攻手很脆\n";
+      else if (n === "物防" && v <= 85) out += "- **物防 " + v + "**：明显短板，怕物攻手\n";
+      else if ((n === "物攻" || n === "魔攻") && v >= 120) out += "- **" + n + " " + v + "**：主力输出方向\n";
+      else if (n === "生命" && v >= 120) out += "- **生命 " + v + "**：血厚，能多吃几下\n";
+    });
+
+    if (pet.t) {
+      out += "- **特性「" + pet.t + "」**：" + (pet.td || "（无描述）") + "\n";
+    }
+
+    // 弱点
+    var weak = Object.keys(TYPES).filter(function (t) { return typeMult(t, pet) > 1; });
+    var strong = Object.keys(TYPES).filter(function (t) { return typeMult(t, pet) < 1; });
+    out += "\n## 配队思路\n\n";
+    out += "1. **补短板队友**：" + worst[0] + " 只有 " + worst[1] + "，是全队最弱项，" +
+      "队里要有能替它挡住的精灵。\n";
+    out += "2. **补克制位**：它怕 " + (weak.slice(0, 4).join("、") || "无明显弱点") +
+      "，队里最好有人能压制这几类，否则被针对就很难打。\n";
+    if (strong.length) {
+      out += "3. **它克制的**：" + strong.slice(0, 4).join("、") + "，可以主动找这些对手开打。\n";
+    }
+    var role = pet.spe >= 110 ? "先手抢节奏，适合当先发或收尾补刀" :
+               pet.hp >= 120 ? "血厚耐打，适合当中转站" : "看阵容搭配，适合补位";
+    out += (strong.length ? "4" : "3") + ". **定位**：" + role + "。\n";
+
+    out += "\n想问具体配招、或者它和某只谁强，接着说就行。";
+    return out;
+  }
+
   function movesAnswer(pet) {
     var ls = learnsetOf(pet.n);
     var names = (ls && ls.s) ? ls.s.slice() : [];
@@ -434,20 +475,51 @@
     }
 
     var pets = extractPet(text);
+
+    // 追问（然后呢/继续/还有呢）：沿用上次聊到的精灵
+    var isFollowUp = /^(然后呢|然后|继续|还有呢|还有吗|接着说|详细点|展开|再多说|再讲讲)[呢吗？?。]*$/.test(text) ||
+                     /^(然后呢|继续)[，,]?/.test(text);
+    if (!pets.length && isFollowUp && lastPet) pets = [lastPet];
+
+    if (!pets.length) {
+      // 兜底：用当前正在编辑的那只精灵
+      var b = bridge();
+      if (b && b.readState) {
+        try {
+          var st = b.readState();
+          if (st.mine && st.mine.pet) {
+            var cur = PETS.filter(function (x) { return x.n === st.mine.pet; })[0];
+            if (cur) {
+              pets = [cur];
+            }
+          }
+        } catch (e) {}
+      }
+    }
+
     if (!pets.length) {
       return "没认出是哪只精灵 :(\n\n" +
-        "试试直接说名字，比如「**圣羽翼王 怎么配招**」。\n" +
+        "你可以：\n" +
+        "• 直接说名字，比如「**圣羽翼王 怎么配招**」\n" +
+        "• 或者什么都不说，我先分析你现在正在编辑的那只\n\n" +
         "（精灵库共 " + PETS.length + " 只，我按名字匹配）";
     }
     var pet = pets[0];
+    lastPet = pet;   // 记住这次聊的是谁
 
-    if (/(?:配招|招式|技能|带什么|怎么配|学什么)/.test(text)) return movesAnswer(pet);
+    // 配队 / 阵容搭配（优先于配招）
+    if (/(?:配队|队伍|组队|阵容|队友|搭配|定位|怎么用这只)/.test(text)) return adviceAnswer(pet);
+    // 追问 → 给定位与配队建议
+    if (/^(然后呢|然后|继续|还有呢|还有吗|接着说|详细点|展开|再多说|再讲讲)[呢吗？?。]*$/.test(text)) {
+      return adviceAnswer(pet);
+    }
+    if (/(?:配招|招式|技能|带什么|学什么)/.test(text)) return movesAnswer(pet);
     if (/(?:弱点|克制|怕什么|抗性|什么系打)/.test(text)) return counterAnswer(pet);
-    return introPet(pet);
+    return adviceAnswer(pet);
   }
 
   /* ============ 在线（接大模型） ============ */
-  function answerOnline(q, cfg) {
+  function answerOnline(q, cfg, onDelta) {
     refreshData();
     // 把相关数据塞进上下文，让模型基于真实数据回答
     var pets = extractPet(String(q || ""));
@@ -480,42 +552,151 @@
       "2. 回答用中文，简洁、分点\n" +
       "3. 用户问怎么用这个工具时，按【使用流程】【计算逻辑】来答\n\n" +
       kbText + "\n\n" +
-      "【本次问题相关的精灵数据】\n" + (ctx || "（本次问题没有匹配到精灵）");
+      liveState() + "\n\n" +
+      "【本次问题相关的精灵数据】\n" + (ctx || "（本次问题没有匹配到精灵）") +
+      "\n\n注意：如果用户说「然后呢」「继续」这类追问，请接着上一轮的内容往下讲，" +
+      "不要说自己没接到上文；如果上轮在讲某只精灵，就继续讲它的配队/打法。" +
+      "如果用户问的和上面配置有关，直接用【用户当前在计算器里的配置】里的信息。";
+
+    // 带上最近几轮对话，让「然后呢」这种追问有上下文
+    var msgs = [{ role: "system", content: sys }]
+      .concat(conv.slice(-MAX_TURNS * 2 - 1, -1))
+      .concat([{ role: "user", content: q }]);
+
+    // 带 onDelta 回调时走流式，否则一次性返回
+    var stream = typeof onDelta === "function";
+    var body = {
+      model: cfg.model,
+      messages: msgs,
+      temperature: 0.3,
+      max_tokens: 900
+    };
+    if (stream) body.stream = true;
 
     return fetch(cfg.ep, {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: "Bearer " + cfg.key },
-      body: JSON.stringify({
-        model: cfg.model,
-        messages: [
-          { role: "system", content: sys },
-          { role: "user", content: q }
-        ],
-        temperature: 0.3,
-        max_tokens: 600
-      })
+      body: JSON.stringify(body)
     }).then(function (r) {
-      return r.text().then(function (t) { return { ok: r.ok, status: r.status, t: t }; });
-    }).then(function (res) {
-      if (!res.ok) {
-        var j = null; try { j = JSON.parse(res.t); } catch (e) {}
-        var em = (j && j.error && j.error.message) || res.t.slice(0, 150);
-        throw new Error("HTTP " + res.status + "：" + em);
+      if (!r.ok) {
+        return r.text().then(function (t) {
+          var j = null; try { j = JSON.parse(t); } catch (e) {}
+          var em = (j && j.error && j.error.message) || t.slice(0, 150);
+          throw new Error("HTTP " + r.status + "：" + em);
+        });
       }
-      var j2 = JSON.parse(res.t);
-      var c2 = (((j2.choices || [])[0] || {}).message || {}).content || "";
-      return c2 || "（模型没有返回内容）";
+      // 不支持流式就退回整体读取
+      if (!stream || !r.body || !r.body.getReader) {
+        return r.text().then(function (t) {
+          var j2 = {};
+          try { j2 = JSON.parse(t); } catch (e) {}
+          var c2 = (((j2.choices || [])[0] || {}).message || {}).content || "";
+          return c2 || "（模型没有返回内容）";
+        });
+      }
+      return readStream(r.body, onDelta);
     });
   }
 
   /* ============ 界面 ============ */
   var box = null, listEl = null, inputEl = null, mode = "offline", cfg = null;
+  var conv = [];           // 对话历史 {role, content}
+  var lastPet = null;      // 上次聊到的精灵，用于「然后呢」这类追问
+  var MAX_TURNS = 12;      // 最多保留 12 轮
 
-  function mdToHtml(s) {
-    return String(s)
-      .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
-      .replace(/\*\*(.+?)\*\*/g, "<b>$1</b>")
-      .replace(/\n/g, "<br>");
+  /** 把 Markdown 渲染成 HTML：标题、列表、粗体、代码、分隔线 */
+  function mdToHtml(src) {
+    var s = String(src == null ? "" : src);
+
+    // 先保护代码块与行内代码
+    var codes = [];
+    s = s.replace(/```([\s\S]*?)```/g, function (m, code) {
+      codes.push('<pre class="mm-pre"><code>' + esc(code.replace(/^\n|\n$/g, "")) + "</code></pre>");
+      return "\u0000CODE" + (codes.length - 1) + "\u0000";
+    });
+    var inlines = [];
+    s = s.replace(/`([^`\n]+)`/g, function (m, code) {
+      inlines.push("<code>" + esc(code) + "</code>");
+      return "\u0000IC" + (inlines.length - 1) + "\u0000";
+    });
+
+    // 转义 HTML
+    s = esc(s);
+
+    // 粗体 / 斜体
+    s = s.replace(/\*\*([^*]+?)\*\*/g, "<b>$1</b>");
+    s = s.replace(/(^|[^*])\*([^*\n]+?)\*(?!\*)/g, "$1<i>$2</i>");
+
+    // 按行处理块级元素
+    var lines = s.split("\n");
+    var out = [], listType = null, para = [];
+
+    function flushPara() {
+      if (!para.length) return;
+      out.push("<p>" + para.join("<br>") + "</p>");
+      para = [];
+    }
+    function closeList() {
+      if (listType) { out.push("</" + listType + ">"); listType = null; }
+    }
+
+    for (var i = 0; i < lines.length; i++) {
+      var ln = lines[i];
+      var t = ln.trim();
+
+      if (!t) { flushPara(); closeList(); continue; }
+
+      // 分隔线
+      if (/^(-{3,}|\*{3,}|_{3,})$/.test(t)) {
+        flushPara(); closeList(); out.push("<hr class='mm-hr'>"); continue;
+      }
+      // 标题
+      var h = /^(#{1,4})\s+(.*)$/.exec(t);
+      if (h) {
+        flushPara(); closeList();
+        var lv = Math.min(4, h[1].length + 2);   // ## → h4 之类，视觉上不过大
+        out.push("<h" + lv + " class='mm-h'>" + h[2] + "</h" + lv + ">");
+        continue;
+      }
+      // 无序列表
+      var ul = /^[-*•]\s+(.*)$/.exec(t);
+      if (ul) {
+        flushPara();
+        if (listType !== "ul") { closeList(); out.push("<ul class='mm-ul'>"); listType = "ul"; }
+        out.push("<li>" + ul[1] + "</li>");
+        continue;
+      }
+      // 有序列表
+      var ol = /^(\d+)[.、)]\s+(.*)$/.exec(t);
+      if (ol) {
+        flushPara();
+        if (listType !== "ol") { closeList(); out.push("<ol class='mm-ol'>"); listType = "ol"; }
+        out.push("<li>" + ol[2] + "</li>");
+        continue;
+      }
+      // 引用
+      var q = /^>\s?(.*)$/.exec(t);
+      if (q) {
+        flushPara(); closeList();
+        out.push("<blockquote class='mm-quote'>" + q[1] + "</blockquote>");
+        continue;
+      }
+      // 普通段落
+      closeList();
+      para.push(t);
+    }
+    flushPara();
+    closeList();
+
+    var html = out.join("");
+    // 还原代码占位
+    html = html.replace(/\u0000CODE(\d+)\u0000/g, function (m, i) { return codes[Number(i)]; });
+    html = html.replace(/\u0000IC(\d+)\u0000/g, function (m, i) { return inlines[Number(i)]; });
+    return html;
+  }
+
+  function esc(s) {
+    return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
   }
 
   function pushMsg(who, text) {
@@ -528,6 +709,43 @@
     listEl.appendChild(row);
     scrollBottom();
     return row;
+  }
+
+  var CONV_KEY = "luoke.miao.conv";
+
+  function saveConv() {
+    try {
+      localStorage.setItem(CONV_KEY, JSON.stringify({
+        conv: conv.slice(-MAX_TURNS * 2),
+        lastPet: lastPet ? lastPet.n : null,
+        at: Date.now()
+      }));
+    } catch (e) {}
+  }
+
+  function restoreConv() {
+    try {
+      var o = JSON.parse(localStorage.getItem(CONV_KEY) || "{}");
+      if (!o || !Array.isArray(o.conv)) return null;
+      // 超过 2 天的对话不再恢复
+      if (o.at && Date.now() - o.at > 2 * 86400000) return null;
+      conv = o.conv;
+      if (o.lastPet) {
+        lastPet = PETS.filter(function (p) { return p.n === o.lastPet; })[0] || null;
+      }
+      return conv;
+    } catch (e) { return null; }
+  }
+
+  function trimConv() {
+    if (conv.length > MAX_TURNS * 2) conv = conv.slice(-MAX_TURNS * 2);
+    saveConv();
+  }
+
+  function resetConv() {
+    conv = [];
+    lastPet = null;
+    try { localStorage.removeItem(CONV_KEY); } catch (e) {}
   }
 
   function scrollBottom() {
@@ -633,6 +851,60 @@
     });
   }
 
+  /** 逐块读取 SSE 流 */
+  function readStream(body, onDelta) {
+    var reader = body.getReader();
+    var dec = new TextDecoder("utf-8");
+    var buf = "", full = "";
+    return new Promise(function (resolve, reject) {
+      function pump() {
+        reader.read().then(function (r) {
+          if (r.done) { resolve(full || "（模型没有返回内容）"); return; }
+          buf += dec.decode(r.value, { stream: true });
+          var lines = buf.split("\n");
+          buf = lines.pop();
+          for (var i = 0; i < lines.length; i++) {
+            var ln = lines[i].trim();
+            if (!ln || ln.indexOf("data:") !== 0) continue;
+            var payload = ln.slice(5).trim();
+            if (payload === "[DONE]") { resolve(full || "（模型没有返回内容）"); return; }
+            try {
+              var j = JSON.parse(payload);
+              var ch = ((j.choices || [])[0] || {}).delta || {};
+              var piece = ch.content || "";
+              if (piece) { full += piece; onDelta(piece, full); }
+            } catch (e) {}
+          }
+          pump();
+        }).catch(reject);
+      }
+      pump();
+    });
+  }
+
+  /** 把计算器当前状态压成一段话，每轮自动带给模型 */
+  function liveState() {
+    var b = bridge();
+    if (!b || !b.readState) return "";
+    try {
+      var st = b.readState();
+      function side(s, name) {
+        var slots = (s.slots || []).filter(Boolean);
+        if (!slots.length) return name + "：还没配";
+        var cur = s.pet || slots[s.active] || slots[0];
+        var mv = (s.moves || []).filter(Boolean).join("、") || "未配";
+        return name + "：" + slots.map(function (n, i) {
+          return (i === s.active ? "【" + n + "】" : n);
+        }).join("、") +
+          "；当前在场 " + cur + "，血量 " + s.hp + "，能量 " + s.energy +
+          "，招式 " + mv + (s.itemName ? "，道具 " + s.itemName : "");
+      }
+      return "【用户当前在计算器里的配置】\n" +
+        side(st.mine, "我方") + "\n" + side(st.foe, "对方") +
+        "\n已记录 " + (st.turn || 0) + " 回合";
+    } catch (e) { return ""; }
+  }
+
   /** 从问题里找相关精灵，给模型补充数据 */
   function relevantContext(q) {
     try {
@@ -723,6 +995,7 @@
     };
     // 清空
     box.querySelector("#mmClear").onclick = function () {
+      resetConv();
       listEl.innerHTML = "";
       pushMsg("bot", GREETING);
       showChips();
@@ -858,8 +1131,17 @@
       inputEl.style.height = Math.min(88, inputEl.scrollHeight) + "px";
     });
 
-    pushMsg("bot", GREETING);
-    showChips();
+    // 恢复上次对话
+    var oldConv = restoreConv();
+    if (oldConv && oldConv.length) {
+      oldConv.forEach(function (m) {
+        pushMsg(m.role === "user" ? "me" : "bot", m.content);
+      });
+      hideChips();
+    } else {
+      pushMsg("bot", GREETING);
+      showChips();
+    }
   }
 
   var GREETING = "喵～我是**喵喵**，你的洛克对战助手。\n\n" +
@@ -902,6 +1184,8 @@
     inputEl.style.height = "auto";
     hideChips();
     pushMsg("me", q);
+    conv.push({ role: "user", content: q });
+    trimConv();
 
     var tryOnline = mode === "online" && cfg && cfg.ep && cfg.key && cfg.model;
 
@@ -912,7 +1196,10 @@
       if (btn) btn.disabled = true;
       setTimeout(function () {
         stop();
-        pushMsg("bot", answerOffline(q));
+        var a = answerOffline(q);
+        pushMsg("bot", a);
+        conv.push({ role: "assistant", content: a });
+        trimConv();
         if (btn) btn.disabled = false;
         busy = false;
       }, 260 + Math.random() * 200);
@@ -923,12 +1210,40 @@
     var stop2 = showTyping();
     var btn2 = box.querySelector("#mmSend");
     if (btn2) btn2.disabled = true;
-    answerOnline(q, cfg).then(function (txt) {
+
+    // 流式：第一个字到达时把「思考中」换成气泡，然后逐字刷新
+    var bubble = null, acc = "";
+    function onDelta(piece, full) {
+      if (!bubble) {
+        stop2();
+        bubble = pushMsg("bot", "");
+      }
+      acc = full;
+      var body = bubble.querySelector(".mm-msg");
+      if (body) {
+        body.innerHTML = mdToHtml(acc) + '<span class="mm-caret"></span>';
+        scrollBottom();
+      }
+    }
+
+    answerOnline(q, cfg, onDelta).then(function (txt) {
       stop2();
-      pushMsg("bot", txt);
+      if (bubble) {
+        var bd = bubble.querySelector(".mm-msg");
+        if (bd) bd.innerHTML = mdToHtml(txt);
+        scrollBottom();
+      }
+      return txt;
+    }).then(function (txt) {
+      if (!bubble) pushMsg("bot", txt);
+      conv.push({ role: "assistant", content: txt });
+      trimConv();
     }).catch(function (e) {
       stop2();
-      pushMsg("bot", "（联网回答失败：" + e.message + "）\n已用离线引擎回答：\n\n" + answerOffline(q));
+      var fallback = "（联网回答失败：" + e.message + "）\n已用离线引擎回答：\n\n" + answerOffline(q);
+      pushMsg("bot", fallback);
+      conv.push({ role: "assistant", content: fallback });
+      trimConv();
     }).then(function () {
       if (btn2) btn2.disabled = false;
       busy = false;
