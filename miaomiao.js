@@ -418,6 +418,118 @@
     listEl.scrollTop = listEl.scrollHeight;
   }
 
+  /** 图片消息：气泡里显示缩略图 */
+  function pushImage(who, dataUrl, caption) {
+    if (!listEl) return null;
+    var row = document.createElement("div");
+    row.className = "mm-row " + (who === "me" ? "me" : "bot");
+    row.innerHTML =
+      '<div class="mm-mini">' + (who === "me" ? "我" : '<img src="icons/miaomiao-avatar.png" alt="">') + "</div>" +
+      '<div class="mm-msg ' + (who === "me" ? "me" : "bot") + ' mm-imgmsg">' +
+        '<img src="' + dataUrl + '" alt="图片">' +
+        (caption ? '<div class="mm-cap">' + mdToHtml(caption) + "</div>" : "") +
+      "</div>";
+    listEl.appendChild(row);
+    scrollBottom();
+    return row;
+  }
+
+  /** 用户发来图片 */
+  function handleImage(file) {
+    if (!file.type || file.type.indexOf("image/") !== 0) {
+      pushMsg("bot", "只能发图片哦。");
+      return;
+    }
+    if (file.size > 8 * 1024 * 1024) {
+      pushMsg("bot", "图片太大了（超过 8MB），先压缩一下再发。");
+      return;
+    }
+    var rd = new FileReader();
+    rd.onload = function () {
+      var dataUrl = String(rd.result);
+      hideChips();
+      pushImage("me", dataUrl);
+
+      var q = (inputEl.value || "").trim();
+      inputEl.value = "";
+      inputEl.style.height = "auto";
+      if (q) pushMsg("me", q);
+
+      var tryOnline = mode === "online" && cfg && cfg.ep && cfg.key && cfg.model;
+      if (!tryOnline) {
+        pushMsg("bot", "图片我看到了，但**离线模式读不了图**。\n\n" +
+          "想让喵喵看图，请：\n" +
+          "• 点右上角 ⚙ → 切到「联网」并填好 API Key\n\n" +
+          "或者用顶部的「截图识别」，把队伍/血量直接导入计算器。");
+        return;
+      }
+      askWithImage(dataUrl, q);
+    };
+    rd.readAsDataURL(file);
+  }
+
+  /** 联网模式：带图提问 */
+  function askWithImage(dataUrl, question) {
+    var stop = showTyping();
+    var btn = box.querySelector("#mmSend");
+    if (btn) btn.disabled = true;
+    busy = true;
+
+    var q = question || "这张截图里是什么？如果是对战或队伍截图，请说明双方精灵、血量、能量和技能。";
+    var b64 = String(dataUrl).split(",")[1];
+
+    fetch(cfg.ep, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: "Bearer " + cfg.key },
+      body: JSON.stringify({
+        model: cfg.model,
+        messages: [{
+          role: "user",
+          content: [
+            { type: "text", text: "你是洛克王国 PVP 助手喵喵。用中文简洁回答，不确定就说不知道，不要编。" +
+                                   (relevantContext(q) || "") + "\n\n用户问题：" + q },
+            { type: "image_url", image_url: { url: dataUrl } }
+          ]
+        }],
+        temperature: 0.2,
+        max_tokens: 900
+      })
+    }).then(function (r) {
+      return r.text().then(function (t) { return { ok: r.ok, status: r.status, t: t }; });
+    }).then(function (res) {
+      stop();
+      if (!res.ok) {
+        var j = null; try { j = JSON.parse(res.t); } catch (e) {}
+        var em = (j && j.error && j.error.message) || res.t.slice(0, 150);
+        pushMsg("bot", "看不了这张图：" + em);
+        return;
+      }
+      var j2 = JSON.parse(res.t);
+      var c2 = (((j2.choices || [])[0] || {}).message || {}).content || "";
+      pushMsg("bot", c2 || "（模型没有返回内容）");
+    }).catch(function (e) {
+      stop();
+      pushMsg("bot", "发送失败：" + e.message);
+    }).then(function () {
+      if (btn) btn.disabled = false;
+      busy = false;
+    });
+  }
+
+  /** 从问题里找相关精灵，给模型补充数据 */
+  function relevantContext(q) {
+    try {
+      var pets = extractPet(String(q || ""));
+      if (!pets.length) return "";
+      var ctx = pets.slice(0, 2).map(function (p) {
+        return "\n【" + p.n + "】" + [p.el, p.el2].filter(Boolean).join("/") + "系｜特性：" + (p.t || "无") +
+          "｜" + (p.td || "") + "｜种族值 生命" + p.hp + " 物攻" + p.atk + " 物防" + p.def +
+          " 魔攻" + p.ma + " 魔防" + p.md + " 速度" + p.spe;
+      }).join("");
+      return ctx ? "\n\n参考数据：" + ctx : "";
+    } catch (e) { return ""; }
+  }
+
   /** 打字指示器：返回一个移除函数 */
   function showTyping() {
     if (!listEl) return function () {};
@@ -473,6 +585,8 @@
       '<div class="mm-chips" id="mmChips"></div>' +
       // 输入
       '<div class="mm-foot">' +
+        '<button type="button" class="mm-attach" id="mmAttach" title="发送图片">📎</button>' +
+        '<input type="file" id="mmFile" accept="image/*" style="display:none">' +
         '<div class="mm-inputwrap">' +
           '<textarea id="mmInput" rows="1" placeholder="问点什么… 例如「翼王怎么配招」"></textarea>' +
         '</div>' +
@@ -605,6 +719,15 @@
           msg3("✗ HTTP " + res.status + "：" + em, true);
         }
       }).catch(function (e) { msg3("✗ 连不上：" + e.message, true); });
+    };
+
+    // 附件
+    var fileEl = box.querySelector("#mmFile");
+    box.querySelector("#mmAttach").onclick = function () { fileEl.click(); };
+    fileEl.onchange = function () {
+      var f = fileEl.files && fileEl.files[0];
+      if (f) handleImage(f);
+      fileEl.value = "";
     };
 
     // 发送

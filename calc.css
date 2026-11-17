@@ -687,6 +687,15 @@ body.embed-mode .tabbar { display:none !important; }
   font-size:13px;color:#33312A;resize:none;max-height:88px;line-height:1.6;
   padding:6px 0;font-family:inherit}
 #miaomiao #mmInput::placeholder{color:#BBAE93}
+#miaomiao .mm-attach{width:32px;height:32px;border-radius:50%;border:1px solid #E8DEC8;
+  background:#fff;color:#8A7D63;font-size:14px;cursor:pointer;flex:0 0 auto;
+  display:flex;align-items:center;justify-content:center;transition:.15s;padding:0}
+#miaomiao .mm-attach:hover{background:#F6FBEC;border-color:#A8D95A;color:#5F8B2A}
+#miaomiao .mm-imgmsg{padding:5px !important;overflow:hidden;max-width:200px}
+#miaomiao .mm-imgmsg img{max-width:100%;max-height:220px;border-radius:9px;display:block;
+  object-fit:contain;background:#000}
+#miaomiao .mm-imgmsg .mm-cap{font-size:11.5px;padding:5px 6px 2px;line-height:1.6;
+  color:inherit;opacity:.9}
 #miaomiao #mmSend{width:34px;height:34px;border-radius:50%;border:0;flex:0 0 auto;
   background:linear-gradient(150deg,#A8D95A,#7CBF2E);color:#fff;font-size:15px;
   cursor:pointer;display:flex;align-items:center;justify-content:center;
