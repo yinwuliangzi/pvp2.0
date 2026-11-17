@@ -6820,7 +6820,7 @@
       try { cfg = JSON.parse(localStorage.getItem(KEY) || "{}"); } catch (e) {}
       var online = !!(cfg && cfg.endpoint && cfg.key && cfg.model);
       if (window.Miao) {
-        window.Miao.open({
+        window.Miao.toggle({
           mode: online ? "online" : "offline",
           cfg: online ? { ep: cfg.endpoint, model: cfg.model, key: cfg.key } : null
         });

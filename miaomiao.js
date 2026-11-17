@@ -403,11 +403,31 @@
 
   function pushMsg(who, text) {
     if (!listEl) return;
-    var d = document.createElement("div");
-    d.className = "mm-msg " + (who === "me" ? "me" : "bot");
-    d.innerHTML = mdToHtml(text);
-    listEl.appendChild(d);
+    var row = document.createElement("div");
+    row.className = "mm-row " + (who === "me" ? "me" : "bot");
+    row.innerHTML =
+      '<div class="mm-mini">' + (who === "me" ? "我" : "🐱") + "</div>" +
+      '<div class="mm-msg ' + (who === "me" ? "me" : "bot") + '">' + mdToHtml(text) + "</div>";
+    listEl.appendChild(row);
+    scrollBottom();
+    return row;
+  }
+
+  function scrollBottom() {
+    if (!listEl) return;
     listEl.scrollTop = listEl.scrollHeight;
+  }
+
+  /** 打字指示器：返回一个移除函数 */
+  function showTyping() {
+    if (!listEl) return function () {};
+    var row = document.createElement("div");
+    row.className = "mm-row bot";
+    row.innerHTML = '<div class="mm-mini">🐱</div>' +
+      '<div class="mm-typing"><i></i><i></i><i></i></div>';
+    listEl.appendChild(row);
+    scrollBottom();
+    return function () { if (row.parentNode) row.parentNode.removeChild(row); };
   }
 
   function build() {
@@ -415,95 +435,224 @@
     box = document.createElement("div");
     box.id = "miaomiao";
     box.innerHTML =
+      // 头部
       '<div class="mm-head">' +
-        '<span class="mm-title">🐱 喵喵</span>' +
-        '<span class="mm-mode" id="mmMode">离线</span>' +
-        '<button type="button" class="mm-gear" id="mmGear" title="设置">⚙</button>' +
-        '<button type="button" class="mm-x" id="mmClose">×</button>' +
+        '<div class="mm-avatar">🐱</div>' +
+        '<div class="mm-id">' +
+          '<div class="mm-title">喵喵</div>' +
+          '<div class="mm-sub"><i class="mm-live" id="mmLive"></i><span id="mmMode">离线·内置数据</span></div>' +
+        '</div>' +
+        '<div class="mm-acts">' +
+          '<button type="button" class="mm-ib" id="mmClear" title="清空对话">🗑</button>' +
+          '<button type="button" class="mm-ib" id="mmGear" title="设置">⚙</button>' +
+          '<button type="button" class="mm-ib" id="mmClose" title="关闭">✕</button>' +
+        '</div>' +
       '</div>' +
+      // 设置
       '<div class="mm-set" id="mmSet" hidden>' +
         '<label><input type="checkbox" id="mmScriptChk"> 允许自定义脚本（js: 开头）</label>' +
-        '<div class="mm-warn">开启后，我发给喵喵的 js: 命令会真的在页面里运行，能读写任何数据。每次执行前都会再确认一次。</div>' +
+        '<div class="mm-warn">开启后，以 js: 开头的命令会真的在页面里运行，能读写任何数据。每次执行前还会再确认一次。</div>' +
       '</div>' +
-      '<div style="display:none">'
-      '</div>' +
+      // 消息
       '<div class="mm-list" id="mmList"></div>' +
+      // 快捷问句
+      '<div class="mm-chips" id="mmChips"></div>' +
+      // 输入
       '<div class="mm-foot">' +
-        '<input id="mmInput" placeholder="问点什么… 例如「翼王怎么配招」">' +
-        '<button type="button" id="mmSend">发送</button>' +
+        '<div class="mm-inputwrap">' +
+          '<textarea id="mmInput" rows="1" placeholder="问点什么… 例如「翼王怎么配招」"></textarea>' +
+        '</div>' +
+        '<button type="button" id="mmSend" title="发送">➤</button>' +
       '</div>' +
-      '<div class="mm-tip">离线模式用内置数据回答，不花钱；接大模型更会聊，需要 API Key。</div>';
+      '<div class="mm-tip">离线用内置数据回答 · 配了 API Key 可切联网</div>';
     document.body.appendChild(box);
+
     listEl = box.querySelector("#mmList");
     inputEl = box.querySelector("#mmInput");
 
-    box.querySelector("#mmClose").onclick = function () { box.style.display = "none"; };
+    // 关闭
+    box.querySelector("#mmClose").onclick = function () {
+      box.style.display = "none";
+      var fab = document.getElementById("mmFab");
+      if (fab) fab.style.display = "";
+    };
+    // 清空
+    box.querySelector("#mmClear").onclick = function () {
+      listEl.innerHTML = "";
+      pushMsg("bot", GREETING);
+      showChips();
+    };
 
+    // 设置
     var setBox = box.querySelector("#mmSet");
     var chk = box.querySelector("#mmScriptChk");
-    if (chk) {
-      chk.checked = scriptEnabled();
-      chk.onchange = function () {
-        if (chk.checked) {
-          var ok = window.confirm("开启自定义脚本后，发 js: 开头的命令会真的执行页面代码。\n攻击者拿到这个页面就能读你的所有数据。\n\n确定开启吗？");
-          if (!ok) { chk.checked = false; return; }
-          setScriptEnabled(true);
-        } else {
-          setScriptEnabled(false);
-        }
-      };
-    }
+    chk.checked = scriptEnabled();
+    chk.onchange = function () {
+      if (chk.checked) {
+        var ok = window.confirm("开启自定义脚本后，发 js: 开头的命令会真的执行页面代码。\n攻击者拿到这个页面就能读你的所有数据。\n\n确定开启吗？");
+        if (!ok) { chk.checked = false; return; }
+        setScriptEnabled(true);
+      } else {
+        setScriptEnabled(false);
+      }
+    };
     box.querySelector("#mmGear").onclick = function () {
       setBox.hidden = !setBox.hidden;
     };
-    box.querySelector("#mmSend").onclick = send;
-    inputEl.addEventListener("keydown", function (e) { if (e.key === "Enter") send(); });
 
-    pushMsg("bot", "喵～我是**喵喵**。\n\n可以问我：\n• 圣羽翼王强吗\n• 翼王怎么配招\n• 迪莫怕什么系\n• 迪莫 vs 焰火");
+    // 发送
+    box.querySelector("#mmSend").onclick = send;
+    inputEl.addEventListener("keydown", function (e) {
+      if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); }
+    });
+    // 输入框自动长高
+    inputEl.addEventListener("input", function () {
+      inputEl.style.height = "auto";
+      inputEl.style.height = Math.min(88, inputEl.scrollHeight) + "px";
+    });
+
+    pushMsg("bot", GREETING);
+    showChips();
   }
 
+  var GREETING = "喵～我是**喵喵**，你的洛克对战助手。\n\n" +
+    "能算伤害、查属性、配招式，也能直接帮你改阵容。";
+
+  var CHIPS = [
+    "我的阵容",
+    "翼王怎么配招",
+    "迪莫怕什么系",
+    "圣羽翼王 vs 迪莫"
+  ];
+
+  function showChips() {
+    var wrap = box && box.querySelector("#mmChips");
+    if (!wrap) return;
+    wrap.innerHTML = CHIPS.map(function (t) {
+      return "<button type='button' class='mm-chip' data-q='" + t + "'>" + t + "</button>";
+    }).join("");
+    Array.prototype.forEach.call(wrap.querySelectorAll(".mm-chip"), function (b) {
+      b.onclick = function () {
+        inputEl.value = b.getAttribute("data-q");
+        send();
+      };
+    });
+  }
+
+  function hideChips() {
+    var wrap = box && box.querySelector("#mmChips");
+    if (wrap) wrap.innerHTML = "";
+  }
+
+  var busy = false;
+
   function send() {
+    if (busy) return;
     var q = (inputEl.value || "").trim();
     if (!q) return;
     inputEl.value = "";
+    inputEl.style.height = "auto";
+    hideChips();
     pushMsg("me", q);
 
-    // 在线模式：先试大模型，失败或未配置回落到离线
     var tryOnline = mode === "online" && cfg && cfg.ep && cfg.key && cfg.model;
+
     if (!tryOnline) {
-      setTimeout(function () { pushMsg("bot", answerOffline(q)); }, 120);
+      busy = true;
+      var stop = showTyping();
+      var btn = box.querySelector("#mmSend");
+      if (btn) btn.disabled = true;
+      setTimeout(function () {
+        stop();
+        pushMsg("bot", answerOffline(q));
+        if (btn) btn.disabled = false;
+        busy = false;
+      }, 260 + Math.random() * 200);
       return;
     }
-    pushMsg("bot", "…");
+
+    busy = true;
+    var stop2 = showTyping();
+    var btn2 = box.querySelector("#mmSend");
+    if (btn2) btn2.disabled = true;
     answerOnline(q, cfg).then(function (txt) {
-      listEl.lastChild.innerHTML = mdToHtml(txt);
+      stop2();
+      pushMsg("bot", txt);
     }).catch(function (e) {
-      listEl.removeChild(listEl.lastChild);
+      stop2();
       pushMsg("bot", "（联网回答失败：" + e.message + "）\n已用离线引擎回答：\n\n" + answerOffline(q));
+    }).then(function () {
+      if (btn2) btn2.disabled = false;
+      busy = false;
     });
+  }
+
+  /** 浮动入口按钮 */
+  function ensureFab() {
+    if (document.getElementById("mmFab")) return;
+    var fab = document.createElement("button");
+    fab.type = "button";
+    fab.className = "mm-fab";
+    fab.id = "mmFab";
+    fab.title = "喵喵 · 对战助手";
+    fab.innerHTML = "🐱";
+    fab.onclick = function () { open({}); };
+    document.body.appendChild(fab);
   }
 
   function open(opts) {
     build();
     box.style.display = "flex";
-    if (inputEl) inputEl.focus();
+    var fab = document.getElementById("mmFab");
+    if (fab) fab.style.display = "none";
+    setTimeout(function () { if (inputEl) inputEl.focus(); }, 60);
     if (opts && opts.mode) setMode(opts.mode, opts.cfg);
+    scrollBottom();
+  }
+
+  function close() {
+    if (box) box.style.display = "none";
+    var fab = document.getElementById("mmFab");
+    if (fab) fab.style.display = "";
   }
 
   function setMode(m, c) {
     mode = m === "online" ? "online" : "offline";
     if (c) cfg = c;
     var el = document.getElementById("mmMode");
-    if (el) {
-      el.textContent = mode === "online" ? "联网" : "离线";
-      el.className = "mm-mode " + (mode === "online" ? "on" : "");
-    }
+    if (el) el.textContent = mode === "online" ? "联网·大模型" : "离线·内置数据";
+    var dot = document.getElementById("mmLive");
+    if (dot) dot.className = "mm-live" + (mode === "online" ? "" : " off");
   }
 
   window.Miao = {
     open: open,
+    close: close,
+    toggle: toggle,
     ask: answerOffline,
     setMode: setMode,
     pets: function () { return PETS.length; }
   };
+
+  // ESC 关闭
+  document.addEventListener("keydown", function (e) {
+    if (e.key === "Escape" && box && box.style.display === "flex") close();
+  });
+
+  /** 开关切换 */
+  function toggle(opts) {
+    if (box && box.style.display === "flex") { close(); return false; }
+    open(opts || {});
+    return true;
+  }
+
+  // 页面加载完挂上浮动入口
+  function boot() {
+    try { ensureFab(); } catch (e) {}
+  }
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", boot);
+  } else {
+    boot();
+  }
 })();

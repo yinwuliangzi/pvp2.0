@@ -555,36 +555,130 @@ body.embed-mode .tabbar { display:none !important; }
 .occ-btns .tbtn{flex:1}
 
 
-/* ===== 喵喵对战助手 ===== */
-#miaomiao{position:fixed;right:18px;bottom:86px;width:330px;height:440px;z-index:10050;
-  display:none;flex-direction:column;background:#fffdf7;border:1px solid #ddd6c6;
-  border-radius:14px;box-shadow:0 16px 44px rgba(40,34,20,.28);overflow:hidden}
-#miaomiao .mm-head{display:flex;align-items:center;gap:8px;padding:10px 12px;
-  background:linear-gradient(160deg,#f3ecd9,#efe6d0);border-bottom:1px solid #e3dac4}
-#miaomiao .mm-title{font-size:14px;font-weight:800;color:#2b2a26}
-#miaomiao .mm-mode{margin-left:auto;font-size:10.5px;padding:2px 8px;border-radius:99px;
-  background:#e8e2d2;color:#8c8677}
-#miaomiao .mm-mode.on{background:#d8f0e2;color:#2e7d4f}
-#miaomiao .mm-x{border:0;background:none;font-size:19px;line-height:1;color:#8c8677;cursor:pointer}
-#miaomiao .mm-list{flex:1 1 auto;overflow-y:auto;padding:12px;display:flex;flex-direction:column;gap:9px}
-#miaomiao .mm-msg{max-width:88%;padding:9px 11px;border-radius:11px;font-size:12.5px;line-height:1.75;word-break:break-word}
-#miaomiao .mm-msg.bot{background:#f3efe3;color:#33312a;align-self:flex-start;border-bottom-left-radius:4px}
-#miaomiao .mm-msg.me{background:#3B6EF5;color:#fff;align-self:flex-end;border-bottom-right-radius:4px}
-#miaomiao .mm-foot{display:flex;gap:7px;padding:9px 11px;border-top:1px solid #ece6d8}
-#miaomiao #mmInput{flex:1 1 auto;padding:8px 10px;border:1px solid #ddd6c6;border-radius:9px;
-  font-size:13px;outline:none;background:#fbf8f0;color:#2b2a26}
-#miaomiao #mmSend{padding:0 14px;border:0;border-radius:9px;background:#3B6EF5;color:#fff;
-  font-size:13px;font-weight:700;cursor:pointer}
-#miaomiao .mm-tip{font-size:10px;color:#a9a294;padding:0 12px 9px;line-height:1.6}
-.mm-fab{position:fixed;right:18px;bottom:44px;width:44px;height:44px;border-radius:50%;
-  border:0;background:#3B6EF5;color:#fff;font-size:20px;cursor:pointer;z-index:10049;
-  box-shadow:0 6px 18px rgba(59,110,245,.4)}
-@media(max-width:700px){
-  #miaomiao{right:8px;left:8px;bottom:8px;width:auto;height:64vh}
-}
+/* ===== 喵喵 AI 对话框 ===== */
+/* 浮动入口 */
+.mm-fab{position:fixed;left:20px;bottom:96px;width:58px;height:58px;border-radius:50%;
+  border:0;cursor:pointer;z-index:10048;display:flex;align-items:center;justify-content:center;
+  background:linear-gradient(150deg,#FFC46B,#FF9A3D);color:#fff;font-size:26px;
+  box-shadow:0 8px 24px rgba(255,150,60,.42),0 2px 6px rgba(0,0,0,.12);
+  transition:transform .18s cubic-bezier(.34,1.56,.64,1),box-shadow .18s}
+.mm-fab:hover{transform:translateY(-3px) scale(1.06);box-shadow:0 12px 30px rgba(255,150,60,.5)}
+.mm-fab:active{transform:scale(.94)}
+.mm-fab .mm-dot{position:absolute;top:5px;right:5px;width:9px;height:9px;border-radius:50%;
+  background:#ff4d4f;border:2px solid #fff}
 
-#miaomiao .mm-gear{border:0;background:none;font-size:15px;color:#8c8677;cursor:pointer;line-height:1}
-#miaomiao .mm-set{padding:10px 12px;background:#fdf6e3;border-bottom:1px solid #ece6d8;font-size:11.5px;color:#6b6455}
-#miaomiao .mm-set label{display:flex;align-items:center;gap:7px;font-weight:700;color:#4a4438;cursor:pointer}
-#miaomiao .mm-set input{width:auto}
-#miaomiao .mm-warn{margin-top:6px;line-height:1.7;color:#a07c2a}
+/* 面板 */
+#miaomiao{position:fixed;left:20px;bottom:96px;width:372px;height:560px;z-index:10050;
+  display:none;flex-direction:column;background:#FFFCF5;
+  border:1px solid #E8DFCB;border-radius:20px;overflow:hidden;
+  box-shadow:0 24px 60px rgba(60,48,26,.26),0 4px 12px rgba(60,48,26,.12);
+  animation:mmUp .22s cubic-bezier(.2,.9,.3,1.1)}
+@keyframes mmUp{from{opacity:0;transform:translateY(14px) scale(.97)}to{opacity:1;transform:none}}
+
+/* 头部 */
+#miaomiao .mm-head{display:flex;align-items:center;gap:10px;padding:12px 14px;
+  background:linear-gradient(135deg,#FFF3DC 0%,#FFE8C4 100%);
+  border-bottom:1px solid #F0E2C6;position:relative}
+#miaomiao .mm-avatar{width:34px;height:34px;border-radius:50%;flex:0 0 auto;
+  background:linear-gradient(150deg,#FFC46B,#FF9A3D);display:flex;align-items:center;
+  justify-content:center;font-size:18px;box-shadow:0 3px 8px rgba(255,150,60,.35)}
+#miaomiao .mm-id{display:flex;flex-direction:column;gap:1px;min-width:0}
+#miaomiao .mm-title{font-size:14px;font-weight:800;color:#2E2A22;letter-spacing:.2px}
+#miaomiao .mm-sub{font-size:10.5px;color:#A08D6B;display:flex;align-items:center;gap:4px}
+#miaomiao .mm-live{width:6px;height:6px;border-radius:50%;background:#39A866;flex:0 0 auto;
+  box-shadow:0 0 0 2px rgba(57,168,102,.18)}
+#miaomiao .mm-live.off{background:#C9BFA8;box-shadow:none}
+
+#miaomiao .mm-acts{margin-left:auto;display:flex;align-items:center;gap:2px}
+#miaomiao .mm-ib{border:0;background:transparent;width:28px;height:28px;border-radius:8px;
+  font-size:14px;color:#8E7A55;cursor:pointer;display:flex;align-items:center;
+  justify-content:center;transition:background .15s,color .15s}
+#miaomiao .mm-ib:hover{background:rgba(255,255,255,.72);color:#5E4D2E}
+
+/* 设置区 */
+#miaomiao .mm-set{padding:10px 14px;background:#FDF6E3;border-bottom:1px solid #EFE4CC;
+  font-size:11.5px;color:#6B6455}
+#miaomiao .mm-set label{display:flex;align-items:center;gap:7px;font-weight:700;
+  color:#4A4438;cursor:pointer}
+#miaomiao .mm-set input{width:auto;margin:0}
+#miaomiao .mm-warn{margin-top:6px;line-height:1.7;color:#A07C2A}
+
+/* 消息区 */
+#miaomiao .mm-list{flex:1 1 auto;overflow-y:auto;overflow-x:hidden;padding:16px 14px 10px;
+  display:flex;flex-direction:column;gap:12px;scroll-behavior:smooth;
+  background:radial-gradient(circle at 50% 0%,#FFFBF0 0%,#FFFCF5 60%)}
+#miaomiao .mm-list::-webkit-scrollbar{width:6px}
+#miaomiao .mm-list::-webkit-scrollbar-thumb{background:#E3D8C0;border-radius:3px}
+#miaomiao .mm-list::-webkit-scrollbar-track{background:transparent}
+
+/* 消息行 */
+#miaomiao .mm-row{display:flex;gap:8px;align-items:flex-end;max-width:100%;
+  animation:mmIn .2s ease-out}
+@keyframes mmIn{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:none}}
+#miaomiao .mm-row.me{flex-direction:row-reverse}
+#miaomiao .mm-mini{width:24px;height:24px;border-radius:50%;flex:0 0 auto;
+  display:flex;align-items:center;justify-content:center;font-size:13px;
+  background:linear-gradient(150deg,#FFD79A,#FFB25E);box-shadow:0 2px 5px rgba(255,150,60,.28)}
+#miaomiao .mm-row.me .mm-mini{background:linear-gradient(150deg,#7FA5FF,#4F7BF5);color:#fff}
+
+#miaomiao .mm-msg{max-width:calc(100% - 70px);padding:10px 13px;border-radius:14px;
+  font-size:13px;line-height:1.78;word-break:break-word;position:relative}
+#miaomiao .mm-msg.bot{background:#fff;color:#33312A;border:1px solid #EFE6D2;
+  border-bottom-left-radius:5px;box-shadow:0 2px 6px rgba(80,64,32,.06)}
+#miaomiao .mm-msg.me{background:linear-gradient(140deg,#4F7BF5,#3B6EF5);color:#fff;
+  border-bottom-right-radius:5px;box-shadow:0 3px 10px rgba(59,110,245,.28)}
+#miaomiao .mm-msg b{font-weight:800}
+#miaomiao .mm-msg.bot b{color:#C4701E}
+#miaomiao .mm-msg.me b{color:#fff}
+#miaomiao .mm-msg code{background:rgba(0,0,0,.06);padding:1px 5px;border-radius:4px;
+  font-family:ui-monospace,Menlo,monospace;font-size:11.5px}
+
+/* 打字指示 */
+#miaomiao .mm-typing{display:flex;gap:4px;padding:12px 14px;background:#fff;
+  border:1px solid #EFE6D2;border-radius:14px;border-bottom-left-radius:5px;width:fit-content}
+#miaomiao .mm-typing i{width:6px;height:6px;border-radius:50%;background:#D9CBB0;
+  animation:mmBlink 1.3s infinite}
+#miaomiao .mm-typing i:nth-child(2){animation-delay:.18s}
+#miaomiao .mm-typing i:nth-child(3){animation-delay:.36s}
+@keyframes mmBlink{0%,60%,100%{opacity:.32;transform:translateY(0)}
+  30%{opacity:1;transform:translateY(-3px)}}
+
+/* 快捷问句 */
+#miaomiao .mm-chips{display:flex;flex-wrap:wrap;gap:6px;padding:0 14px 10px}
+#miaomiao .mm-chip{border:1px solid #EADFC6;background:#FFF9EC;color:#8A6E3C;
+  border-radius:99px;padding:5px 11px;font-size:11.5px;cursor:pointer;
+  transition:.15s;white-space:nowrap}
+#miaomiao .mm-chip:hover{background:#FFEFCF;border-color:#F0CE8E;color:#7A5A1E}
+#miaomiao .mm-chip:active{transform:scale(.96)}
+
+/* 输入区 */
+#miaomiao .mm-foot{display:flex;align-items:flex-end;gap:8px;padding:10px 12px 12px;
+  border-top:1px solid #F0E8D6;background:#FFFCF5}
+#miaomiao .mm-inputwrap{flex:1 1 auto;display:flex;align-items:center;
+  background:#fff;border:1px solid #E8DEC8;border-radius:16px;padding:4px 6px 4px 12px;
+  transition:border-color .15s,box-shadow .15s}
+#miaomiao .mm-inputwrap:focus-within{border-color:#F0C179;
+  box-shadow:0 0 0 3px rgba(240,193,121,.16)}
+#miaomiao #mmInput{flex:1 1 auto;border:0;outline:none;background:transparent;
+  font-size:13px;color:#33312A;resize:none;max-height:88px;line-height:1.6;
+  padding:6px 0;font-family:inherit}
+#miaomiao #mmInput::placeholder{color:#BBAE93}
+#miaomiao #mmSend{width:34px;height:34px;border-radius:50%;border:0;flex:0 0 auto;
+  background:linear-gradient(150deg,#FFC46B,#FF9A3D);color:#fff;font-size:15px;
+  cursor:pointer;display:flex;align-items:center;justify-content:center;
+  transition:.15s;box-shadow:0 3px 8px rgba(255,150,60,.34)}
+#miaomiao #mmSend:hover{transform:scale(1.06)}
+#miaomiao #mmSend:disabled{opacity:.45;cursor:not-allowed;transform:none;box-shadow:none}
+
+/* 底部说明 */
+#miaomiao .mm-tip{font-size:10px;color:#B6A98F;padding:0 14px 10px;line-height:1.6;
+  background:#FFFCF5;text-align:center}
+
+/* 手机 */
+@media(max-width:700px){
+  .mm-fab{left:14px;bottom:78px;width:52px;height:52px;font-size:23px}
+  #miaomiao{left:8px;right:8px;bottom:8px;top:8px;width:auto;height:auto;
+    border-radius:18px}
+  #miaomiao .mm-list{padding:14px 12px 8px}
+  #miaomiao .mm-msg{font-size:13.5px}
+}
