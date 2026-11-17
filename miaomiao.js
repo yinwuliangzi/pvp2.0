@@ -161,13 +161,15 @@
     var bestA = movesA.sort(function (x, y) { return (y.p || 0) - (x.p || 0); })[0];
     var bestB = movesB.sort(function (x, y) { return (y.p || 0) - (x.p || 0); })[0];
     if (bestA) {
-      var d1 = estimateDamage(a, b, bestA);
+      var rd1 = realDamage("mine", bestA.n);
+      var d1 = (rd1 && rd1.ok) ? rd1.dmg : estimateDamage(a, b, bestA);
       out.push(a.n + " 用 **" + bestA.n + "**：" + d1 + " 伤害");
       var hpB = statOf(b, "hp");
       out.push("  → " + b.n + " 血量约 " + hpB + "，需要 **" + Math.ceil(hpB / d1) + " 下**");
     }
     if (bestB) {
-      var d2 = estimateDamage(b, a, bestB);
+      var rd2 = realDamage("foe", bestB.n);
+      var d2 = (rd2 && rd2.ok) ? rd2.dmg : estimateDamage(b, a, bestB);
       out.push("");
       out.push(b.n + " 用 **" + bestB.n + "**：" + d2 + " 伤害");
       var hpA = statOf(a, "hp");
@@ -177,7 +179,7 @@
     out.push("");
     out.push("速度：" + a.n + " " + spA + " vs " + b.n + " " + spB + " → **" + (spA >= spB ? a.n : b.n) + " 先手**");
     out.push("");
-    out.push("（这是按 60 级 5 星满个体的粗略估算，实际请用对战矩阵）");
+    out.push(rd1 && rd1.ok ? "（伤害来自计算器完整引擎，含特性/印记/天气）" : "（这是按 60 级 5 星满个体的粗略估算，实际请用对战矩阵）");
     return out.join("\n");
   }
 
@@ -214,6 +216,75 @@
     } catch (e) {
       return "❌ 执行出错：" + e.message;
     }
+  }
+
+  /* ============ 计算器知识库 ============ */
+  // 让喵喵知道这个工具怎么用、怎么算、有什么限制
+  var KB = {
+    about: "洛克王国 PVP 对战助手是一个本地工具：配好双方阵容后，能算伤害、看对位、推演全局、估胜率。所有数据存在浏览器本地，不上传。",
+    workflow: [
+      "① 在「对战计算器」配好双方精灵（属性、血脉、特性、4 个招式、等级星级个体）",
+      "② 点顶部「对战矩阵」看 6x6 对位：谁打谁几个回合、谁先手、哪些是必输局",
+      "③ 点「对局路径」看整套阵容怎么打到收尾，它会给换人建议",
+      "④ 点「胜率估计」把当前局面压成 7 个特征，估个胜率",
+      "⑤ 实战时按「对战」页逐回合记录，边打边看伤害和能量"
+    ],
+    formulas: {
+      damage: "伤害 = 威力 × (攻/防) × 0.42 × 本系1.2 × 克制倍率，再叠加特性、印记、天气、道具",
+      speed: "速度高者先手；同速随机；迅捷技能无视速度",
+      energy: "每回合结束回 2 能量，上限 10；能量不够时该招自动变聚能",
+      ko: "击杀需要的回合数 = ceil(对方血量 / 单次伤害)",
+      rounds: "对位回合差 = 对方击杀我需要的回合 − 我击杀对方需要的回合，正数代表我占优"
+    },
+    notes: [
+      "克制是叠乘的：双属性可能吃到 2 倍甚至更高",
+      "特性按官方描述自动解析，判断不了的会标注「未计入」，不会静默忽略",
+      "没有官方招式表的精灵，会按属性推测 4 招，界面会标注「推测」",
+      "截图识别需要你自己的 API Key，只存在本机"
+    ],
+    limits: [
+      "伤害按公式估算，实际游戏可能有随机浮动",
+      "部分特性机制复杂（比如需要在特定回合触发），计算器会标注未计入",
+      "对方阵容是你自己填的，不是真实对手"
+    ]
+  };
+
+  function kbAnswer(text) {
+    var t = String(text || "");
+    if (/(怎么用|如何使用|怎么开始|新手|上手指南|流程)/.test(t)) {
+      return "**这个计算器怎么用**\n\n" + KB.workflow.join("\n") + "\n\n" + KB.about;
+    }
+    if (/(公式|怎么算|伤害怎么|原理|计算方式)/.test(t)) {
+      var f = KB.formulas;
+      return "**核心计算逻辑**\n\n" +
+        "• 伤害：" + f.damage + "\n" +
+        "• 速度：" + f.speed + "\n" +
+        "• 能量：" + f.energy + "\n" +
+        "• 击杀回合：" + f.ko + "\n" +
+        "• 对位回合差：" + f.rounds;
+    }
+    if (/(有什么功能|能做什么|有哪些|功能列表)/.test(t)) {
+      var b = bridge();
+      if (!b || !b.features) return "功能列表暂时读不到，你可以看顶部那排按钮。";
+      var fe = b.features();
+      var out = "**计算器能做的事**\n\n";
+      out += "三个视图：\n" + fe.views.map(function (v) { return "• " + v.name + " — " + v.desc; }).join("\n");
+      out += "\n\n主要按钮：\n" + fe.buttons.map(function (x) { return "• " + x.name + " — " + x.desc; }).join("\n");
+      out += "\n\n其他页面：\n" + fe.pages.map(function (x) { return "• " + x.name + " — " + x.desc; }).join("\n");
+      return out;
+    }
+    if (/(局限|不准|准吗|准不准|准确|误差|为什么和游戏|靠谱|可信)/.test(t)) {
+      return "**这个工具的边界**\n\n" + KB.limits.map(function (x) { return "• " + x; }).join("\n") +
+        "\n\n" + KB.notes.map(function (x) { return "• " + x; }).join("\n");
+    }
+    return null;
+  }
+
+  /** 用真实引擎算伤害 */
+  function realDamage(side, skillName) {
+    var b = bridge();
+    if (!b || !b.damage) return null;
+    return b.damage(side, skillName);
   }
 
   /* ============ 阵容感知与操作 ============ */
@@ -325,6 +396,10 @@
     var text = String(q || "").trim();
     if (!text) return "在的，问吧。";
 
+    // 先看是不是在问「工具本身」
+    var kb = kbAnswer(text);
+    if (kb) return kb;
+
     // 看阵容
     if (/(?:我|当前|现在).{0,4}(?:阵容|队伍|配的|带了)|阵容|双方|读一下/.test(text) && !/vs|配招|弱点/.test(text)) {
       return teamAnswer();
@@ -387,8 +462,25 @@
              "｜可学招式：" + pool;
     }).join("\n");
 
-    var sys = "你是「喵喵」，洛克王国 PVP 对战助手。只依据下面给出的数据回答，数据里没有就说不知道，不要编。回答用中文，简洁分点。\n\n" +
-              "【相关精灵数据】\n" + (ctx || "（本次问题没有匹配到精灵）");
+    // 把计算器的知识也交给模型
+    var kbText = "【这个工具是什么】" + KB.about +
+      "\n\n【使用流程】\n" + KB.workflow.join("\n") +
+      "\n\n【计算逻辑】\n" +
+      "伤害：" + KB.formulas.damage + "\n" +
+      "速度：" + KB.formulas.speed + "\n" +
+      "能量：" + KB.formulas.energy + "\n" +
+      "击杀回合：" + KB.formulas.ko + "\n" +
+      "对位回合差：" + KB.formulas.rounds +
+      "\n\n【注意事项】\n" + KB.notes.concat(KB.limits).map(function (x) { return "• " + x; }).join("\n");
+
+    var sys = "你是「喵喵」，洛克王国 PVP 对战助手，内嵌在「对战助手」网站里。" +
+      "你对这个计算器的功能和计算逻辑了如指掌，可以指导用户怎么用它。\n\n" +
+      "规则：\n" +
+      "1. 只依据下面给出的数据回答；数据里没有就说不知道，绝不编造精灵名、技能名或数值\n" +
+      "2. 回答用中文，简洁、分点\n" +
+      "3. 用户问怎么用这个工具时，按【使用流程】【计算逻辑】来答\n\n" +
+      kbText + "\n\n" +
+      "【本次问题相关的精灵数据】\n" + (ctx || "（本次问题没有匹配到精灵）");
 
     return fetch(cfg.ep, {
       method: "POST",
@@ -775,6 +867,7 @@
 
   var CHIPS = [
     "我的阵容",
+    "这个计算器怎么用",
     "翼王怎么配招",
     "迪莫怕什么系",
     "圣羽翼王 vs 迪莫"

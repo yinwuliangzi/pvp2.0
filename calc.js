@@ -2981,6 +2981,110 @@
       if (b) { b.click(); return { ok: true, msg: "已撤销一回合" }; }
       return { ok: false, msg: "没有可撤销的" };
     },
+    // ===== 能力接口：让喵喵懂计算器本身 =====
+
+    /** 真实伤害（走完整引擎，含特性/印记/天气/克制） */
+    damage: function (side, skillName) {
+      side = side === "foe" ? "foe" : "mine";
+      var sk = SKILLS.filter(function (x) { return x.n === skillName; })[0] ||
+               SKILLS.filter(function (x) { return x.n.indexOf(String(skillName)) >= 0; })[0];
+      if (!sk) return { ok: false, msg: "技能库里没有「" + skillName + "」" };
+      try {
+        var me = sideStats(side);
+        var opp = sideStats(side === "mine" ? "foe" : "mine");
+        var d = hitDamage(side, sk, me, opp, -1, false);
+        var hp = opp.stats.hp;
+        return {
+          ok: true,
+          skill: sk.n, type: sk.e, power: sk.p, cost: sk.c, cat: sk.t,
+          attacker: me.pet.n, defender: opp.pet.n,
+          dmg: d, defHp: hp, hits: d > 0 ? Math.ceil(hp / d) : 99,
+          pct: d > 0 ? Math.round(d / hp * 100) : 0,
+          eff: typeMult(sk.e, opp.pet),
+          ko: d >= hp
+        };
+      } catch (e) { return { ok: false, msg: e.message }; }
+    },
+
+    /** 当前对位的 6x6 回合差矩阵 */
+    matrix: function () {
+      try {
+        var d = window.__lsDuelDataFull && window.__lsDuelDataFull();
+        if (!d || !d.T) return { ok: false, msg: "还没有足够的阵容数据" };
+        return {
+          ok: true,
+          mine: d.my.map(function (x) { return x.n; }),
+          foe: d.foe.map(function (x) { return x.n; }),
+          T: d.T,
+          source: d.src || "calc"
+        };
+      } catch (e) { return { ok: false, msg: e.message }; }
+    },
+
+    /** 计算器的功能地图 */
+    features: function () {
+      return {
+        views: [
+          { id: "mine", name: "我方精灵", desc: "配我方 6 只：精灵、属性、血脉、特性、4 个招式、等级星级个体值" },
+          { id: "battle", name: "对战", desc: "逐回合记录出招，算伤害、能量、换人、特性触发" },
+          { id: "foe", name: "敌方精灵", desc: "配对方 6 只，同上" }
+        ],
+        buttons: [
+          { id: "recordTurn", name: "记录本回合", desc: "按当前双方动作推演一回合" },
+          { id: "undoTurn", name: "撤回上一回合", desc: "撤销最近一次记录" },
+          { id: "clearTurns", name: "清空", desc: "清空全部回合记录" },
+          { id: "exportBtn", name: "导出记录", desc: "把回合记录导出成文件" },
+          { id: "exportMdBtn", name: "导出表格", desc: "导出 Markdown 对战表" },
+          { id: "ocrOpen", name: "截图识别", desc: "上传截图，用视觉模型读血量/能量/招式，支持队伍图导入" },
+          { id: "relayShow", name: "接抓包", desc: "连接本地抓包端口，实时同步游戏数据" },
+          { id: "overlayBtn", name: "悬浮", desc: "在游戏上层显示悬浮操作栏" },
+          { id: "hudToggle", name: "小窗", desc: "打开简易操作小窗" },
+          { id: "covBtn", name: "自检", desc: "检查数据完整性" },
+          { id: "shareBtn", name: "分享", desc: "生成可分享的配置" }
+        ],
+        pages: [
+          { href: "matrix.html", name: "对战矩阵", desc: "6x6 对位表，看每对需要几个回合、谁先手、哪些是必赢/必输局" },
+          { href: "route.html", name: "对局路径", desc: "从首发到收尾逐步推演全局，给出换人和应对建议" },
+          { href: "winrate.html", name: "胜率估计", desc: "把局面压成 7 个特征向量，用逻辑回归估胜率" },
+          { href: "guide.html", name: "教程", desc: "从安装到各项功能的使用说明" },
+          { href: "battle-deck.html", name: "横屏台", desc: "横屏对局用的悬浮界面" }
+        ],
+        items: Object.keys(ITEM_DEFS).map(function (k) {
+          var d = ITEM_DEFS[k];
+          return { key: k, name: d.n, desc: d.d, uses: d.uses, cooldown: d.cooldown };
+        }),
+        data: {
+          pets: PETS.length,
+          skills: SKILLS.length,
+          withLearnset: Object.keys(window.LEARNSETS || {}).length
+        }
+      };
+    },
+
+    /** 查技能详情 */
+    skillInfo: function (name) {
+      var sk = SKILLS.filter(function (x) { return x.n === name; })[0] ||
+               SKILLS.filter(function (x) { return x.n.indexOf(String(name)) >= 0; })[0];
+      if (!sk) return { ok: false, msg: "没找到" };
+      return { ok: true, n: sk.n, e: sk.e, t: sk.t, p: sk.p, c: sk.c, d: sk.d || "" };
+    },
+
+    /** 查精灵详情 */
+    petInfo: function (name) {
+      var list = window.__ALL_PETS || PETS;
+      var p = list.filter(function (x) { return x.n === name; })[0] ||
+              list.filter(function (x) { return x.n.indexOf(String(name)) >= 0; })[0];
+      if (!p) return { ok: false, msg: "没找到" };
+      var ls = null;
+      try { ls = LEARNSETS[p.n] || null; } catch (e) {}
+      return {
+        ok: true, n: p.n, el: p.el, el2: p.el2 || "",
+        hp: p.hp, atk: p.atk, def: p.def, ma: p.ma, md: p.md, spe: p.spe,
+        trait: p.t || "", traitDesc: p.td || "",
+        learnset: ls && ls.s ? ls.s.length : 0
+      };
+    },
+
     // 存档
     exportSave: function () { try { return localStorage.getItem(KEY) || ""; } catch (e) { return ""; } },
     importSave: function (json) {
