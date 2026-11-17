@@ -569,7 +569,7 @@
       model: cfg.model,
       messages: msgs,
       temperature: 0.3,
-      max_tokens: 900
+      max_tokens: 1500
     };
     if (stream) body.stream = true;
 
@@ -590,11 +590,46 @@
         return r.text().then(function (t) {
           var j2 = {};
           try { j2 = JSON.parse(t); } catch (e) {}
-          var c2 = (((j2.choices || [])[0] || {}).message || {}).content || "";
-          return c2 || "（模型没有返回内容）";
+          if (j2.error) throw new Error("接口报错：" + (j2.error.message || "未知"));
+          var msg = ((j2.choices || [])[0] || {}).message || {};
+          var c2 = msg.content || "";
+          var reason = ((j2.choices || [])[0] || {}).finish_reason || "";
+          if (!c2) {
+            throw new Error("模型返回空。finish_reason=" + (reason || "无") +
+              (msg.reasoning_content ? "（只返回了思考内容，可能 max_tokens 太小）" : "") +
+              " 原始：" + t.slice(0, 200));
+          }
+          return c2;
         });
       }
-      return readStream(r.body, onDelta);
+      return readStream(r.body, onDelta).catch(function (err) {
+        // 流式没拿到正文 → 用非流式再试一次
+        return fetch(cfg.ep, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: "Bearer " + cfg.key },
+          body: JSON.stringify({
+            model: cfg.model,
+            messages: msgs,
+            temperature: 0.3,
+            max_tokens: 2000
+          })
+        }).then(function (r2) {
+          return r2.text().then(function (t) {
+            var j = {};
+            try { j = JSON.parse(t); } catch (e) {}
+            if (j.error) throw new Error("接口报错：" + (j.error.message || "未知"));
+            var msg = ((j.choices || [])[0] || {}).message || {};
+            var c2 = String(msg.content || "").trim();
+            if (!c2) {
+              var fr = ((j.choices || [])[0] || {}).finish_reason || "";
+              throw new Error("模型只返回了思考过程，没有正文（finish_reason=" + (fr || "无") +
+                "）。可能是这个模型不适合直接对话，建议换 deepseek-chat");
+            }
+            onDelta(c2, c2);
+            return c2;
+          });
+        });
+      });
     });
   }
 
@@ -855,22 +890,43 @@
   function readStream(body, onDelta) {
     var reader = body.getReader();
     var dec = new TextDecoder("utf-8");
-    var buf = "", full = "";
+    var buf = "", full = "", raw = "";
     return new Promise(function (resolve, reject) {
       function pump() {
         reader.read().then(function (r) {
-          if (r.done) { resolve(full || "（模型没有返回内容）"); return; }
-          buf += dec.decode(r.value, { stream: true });
+          if (r.done) {
+            if (full) { resolve(full); return; }
+            // 一个字都没拿到 → 把原始返回带出去，方便定位
+            if (raw.trim()) {
+              reject(new Error("返回里没有文字。原始内容：" + raw.slice(0, 300)));
+            } else {
+              reject(new Error("接口返回了空内容"));
+            }
+            return;
+          }
+          var chunk = dec.decode(r.value, { stream: true });
+          raw += chunk;
+          buf += chunk;
           var lines = buf.split("\n");
           buf = lines.pop();
           for (var i = 0; i < lines.length; i++) {
             var ln = lines[i].trim();
-            if (!ln || ln.indexOf("data:") !== 0) continue;
+            if (!ln) continue;
+            if (ln.indexOf("data:") !== 0) continue;
             var payload = ln.slice(5).trim();
-            if (payload === "[DONE]") { resolve(full || "（模型没有返回内容）"); return; }
+            if (payload === "[DONE]") {
+              if (full) { resolve(full); }
+              else { reject(new Error("模型只返回了思考过程，没有正文")); }
+              return;
+            }
             try {
               var j = JSON.parse(payload);
+              if (j.error) {
+                reject(new Error("接口报错：" + (j.error.message || JSON.stringify(j.error).slice(0, 200))));
+                return;
+              }
               var ch = ((j.choices || [])[0] || {}).delta || {};
+              // 思考型模型会先吐 reasoning_content，正文在 content；只取正文
               var piece = ch.content || "";
               if (piece) { full += piece; onDelta(piece, full); }
             } catch (e) {}
@@ -1240,7 +1296,10 @@
       trimConv();
     }).catch(function (e) {
       stop2();
-      var fallback = "（联网回答失败：" + e.message + "）\n已用离线引擎回答：\n\n" + answerOffline(q);
+      // 联网失败 → 自动回落到离线引擎，保证总有答案
+      var off = answerOffline(q);
+      var fallback = "⚠️ 联网失败：" + e.message +
+        "\n\n（已改用离线数据回答 ↓）\n\n" + off;
       pushMsg("bot", fallback);
       conv.push({ role: "assistant", content: fallback });
       trimConv();
