@@ -1814,7 +1814,7 @@
           (h.regressLog ? " · " + h.regressLog : "") +
           (h.choiceLog ? " · 选择：" + h.choiceLog : "") +
           (h.statusLog && h.statusLog.length ? " · " + h.statusLog.join("；") : "") +
-          (h.itemMe ? " · 我进化 " + h.itemMe : "") + (h.itemFoe ? " · 敌进化 " + h.itemFoe : "") +
+          (h.itemMe ? " · 我用 " + h.itemMe : "") + (h.itemFoe ? " · 敌用 " + h.itemFoe : "") +
           (h.buffLog && h.buffLog.length ? " · 回合结束 " + h.buffLog.join("、") : "") +
           (h.switchedMe ? " · 我换" + h.switchedMe : "") +
           (h.switchedFoe ? " · 敌换" + h.switchedFoe : "") +
@@ -2095,6 +2095,17 @@
     if ($("meAction") && state.uiAction) $("meAction").value = state.uiAction;
     fillStrategies();
     if ($("doubleMode")) $("doubleMode").value = state.doubles ? "1" : "";
+    // 动作下拉里的「道具（xxx）」跟着装备变
+    [["mine", "meAction"], ["foe", "foeActionRec"]].forEach(function (pair) {
+      var sel = $(pair[1]);
+      if (!sel) return;
+      var opt = Array.prototype.filter.call(sel.options, function (o) { return o.value === "item"; })[0];
+      if (!opt) return;
+      var k = itemOf(pair[0]);
+      var d = ITEM_DEFS[k] || ITEM_DEFS.evolve;
+      opt.textContent = "道具（" + d.n + "）";
+    });
+
     // 形态行：只有装备愿力强化时显示
     var formLine = $("mineFormLine");
     if (formLine) {
@@ -2881,7 +2892,10 @@
           level: s.level, star: s.star, iv: JSON.parse(JSON.stringify(s.iv || {})),
           nature: s.nature || "",
           moves: (s.moves || []).slice(),
-          status: s.status || ""
+          status: s.status || "",
+          item: s.item || "evolve",
+          itemName: (ITEM_DEFS[s.item || "evolve"] || {}).n || "",
+          form: s.form || ""
         };
       }
       return {
@@ -5166,15 +5180,24 @@
     }
 
     var itemMe = null, itemFoe = null;
+    function itemLabel(sd) {
+      var k = itemOf(sd);
+      return (ITEM_DEFS[k] || ITEM_DEFS.evolve).n;
+    }
     if (meAct === "item") {
+      var nmM = itemLabel("mine");
       var r1 = useItem("mine");
-      if (!r1.ok) { notice("用不了进化之力：" + r1.msg); return; }
-      itemMe = r1.msg + (r1.leader ? "" : "（非首领形态，机制上不该可用）");
+      if (!r1.ok) { notice("用不了" + nmM + "：" + r1.msg); return; }
+      // 只有进化之力才有「非首领形态」的限制
+      var extraM = (itemOf("mine") === "evolve" && !r1.leader) ? "（非首领形态，机制上不该可用）" : "";
+      itemMe = nmM + "：" + r1.msg + extraM;
     }
     if (foeAct === "item") {
+      var nmF = itemLabel("foe");
       var r2 = useItem("foe");
-      if (!r2.ok) { notice("对手用不了进化之力：" + r2.msg); return; }
-      itemFoe = r2.msg + (r2.leader ? "" : "（非首领形态，机制上不该可用）");
+      if (!r2.ok) { notice("对手用不了" + nmF + "：" + r2.msg); return; }
+      var extraF = (itemOf("foe") === "evolve" && !r2.leader) ? "（非首领形态，机制上不该可用）" : "";
+      itemFoe = nmF + "：" + r2.msg + extraF;
     }
     if (itemMe || itemFoe) { mine = sideStats("mine"); foe = sideStats("foe"); }
 
