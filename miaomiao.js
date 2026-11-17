@@ -406,7 +406,7 @@
     var row = document.createElement("div");
     row.className = "mm-row " + (who === "me" ? "me" : "bot");
     row.innerHTML =
-      '<div class="mm-mini">' + (who === "me" ? "我" : "🐱") + "</div>" +
+      '<div class="mm-mini">' + (who === "me" ? "我" : '<img src="icons/miaomiao-avatar.png" alt="">') + "</div>" +
       '<div class="mm-msg ' + (who === "me" ? "me" : "bot") + '">' + mdToHtml(text) + "</div>";
     listEl.appendChild(row);
     scrollBottom();
@@ -423,7 +423,7 @@
     if (!listEl) return function () {};
     var row = document.createElement("div");
     row.className = "mm-row bot";
-    row.innerHTML = '<div class="mm-mini">🐱</div>' +
+    row.innerHTML = '<div class="mm-mini"><img src="icons/miaomiao-avatar.png" alt=""></div>' +
       '<div class="mm-typing"><i></i><i></i><i></i></div>';
     listEl.appendChild(row);
     scrollBottom();
@@ -437,7 +437,7 @@
     box.innerHTML =
       // 头部
       '<div class="mm-head">' +
-        '<div class="mm-avatar">🐱</div>' +
+        '<div class="mm-avatar"><img src="icons/miaomiao-avatar.png" alt="喵喵"></div>' +
         '<div class="mm-id">' +
           '<div class="mm-title">喵喵</div>' +
           '<div class="mm-sub"><i class="mm-live" id="mmLive"></i><span id="mmMode">离线·内置数据</span></div>' +
@@ -595,7 +595,7 @@
     fab.className = "mm-fab";
     fab.id = "mmFab";
     fab.title = "喵喵 · 对战助手";
-    fab.innerHTML = "🐱";
+    fab.innerHTML = '<img src="icons/miaomiao-avatar.png" alt="喵喵">';
     fab.onclick = function () { open({}); };
     document.body.appendChild(fab);
   }
