@@ -5,9 +5,18 @@
 (function () {
   "use strict";
 
-  var PETS = window.PETS || [];
-  var SKILLS = window.SKILLS || [];
+  var PETS = window.__ALL_PETS || window.PETS || [];
+  var SKILLS = window.__ALL_SKILLS || window.SKILLS || [];
   var TYPES = window.TYPES || {};
+
+  /** 每次回答前刷新数据源，避免拿到 calc.js 合并前的旧列表 */
+  function refreshData() {
+    if (window.__ALL_PETS && window.__ALL_PETS.length) PETS = window.__ALL_PETS;
+    else if (window.PETS && window.PETS.length) PETS = window.PETS;
+    if (window.__ALL_SKILLS && window.__ALL_SKILLS.length) SKILLS = window.__ALL_SKILLS;
+    else if (window.SKILLS && window.SKILLS.length) SKILLS = window.SKILLS;
+    if (window.TYPES) TYPES = window.TYPES;
+  }
 
   /* ============ 基础查询 ============ */
   function petByName(n) {
@@ -104,7 +113,21 @@
   function movesAnswer(pet) {
     var ls = learnsetOf(pet.n);
     var names = (ls && ls.s) ? ls.s.slice() : [];
-    if (!names.length) return "精灵库里没有 **" + pet.n + "** 的可学招式记录。";
+    if (!names.length) {
+      // 没有官方招式表 → 按属性推测（与计算器一致）
+      var pool = SKILLS.filter(function (s) {
+        return s.e === pet.el || s.e === pet.el2;
+      }).filter(function (s) { return s.t !== "状态" && Number(s.p) > 0; });
+      pool.sort(function (a, b) { return (Number(b.p) || 0) - (Number(a.p) || 0); });
+      if (!pool.length) return "**" + pet.n + "** 没有可学招式记录，也没有同属性技能可推测。";
+      var out = "**" + pet.n + "**（" + [pet.el, pet.el2].filter(Boolean).join("/") + "系）没有官方招式表，" +
+                "下面四招是**按属性推测**的，仅供参考：\n\n";
+      pool.slice(0, 4).forEach(function (s, i) {
+        out += (i + 1) + ". **" + s.n + "** " + s.e + " · 威力 " + (s.p || "—") + " · 耗能 " + (s.c || 0) + "\n";
+      });
+      out += "\n实际配招要看它实际能学什么，建议在游戏里确认。";
+      return out;
+    }
     var list = names.map(function (n) {
       var s = skByName(n);
       if (!s) return null;
@@ -298,6 +321,7 @@
   }
 
   function answerOffline(q) {
+    refreshData();
     var text = String(q || "").trim();
     if (!text) return "在的，问吧。";
 
@@ -349,6 +373,7 @@
 
   /* ============ 在线（接大模型） ============ */
   function answerOnline(q, cfg) {
+    refreshData();
     // 把相关数据塞进上下文，让模型基于真实数据回答
     var pets = extractPet(String(q || ""));
     var ctx = pets.slice(0, 2).map(function (p) {
@@ -831,6 +856,7 @@
   }
 
   function open(opts) {
+    refreshData();
     build();
     // 恢复上次使用的模式
     if (!opts || !opts.mode) {

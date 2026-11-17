@@ -102,6 +102,7 @@
 
   window.__ALL_PETS = PETS;   // 合并/去重后的精灵列表（供自检与调试）
   var SKILLS = (window.SKILLS || []).slice();
+  window.__ALL_SKILLS = SKILLS;   // 合并后的技能列表（下面会继续 push）
   // S5 新技能
   if (Array.isArray(window.SKILLS_S5)) {
     var haveS5s = {};
