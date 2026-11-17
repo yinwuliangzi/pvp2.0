@@ -569,7 +569,7 @@
       model: cfg.model,
       messages: msgs,
       temperature: 0.3,
-      max_tokens: 1500
+      max_tokens: 4000
     };
     if (stream) body.stream = true;
 
@@ -602,7 +602,11 @@
           return c2;
         });
       }
-      return readStream(r.body, onDelta).catch(function (err) {
+      return readStream(r.body, onDelta).then(function (res) {
+        // 被长度截断 → 自动续写
+        if (!res.truncated) return res.text;
+        return continueAnswer(msgs, res.text, cfg, onDelta, 0);
+      }).catch(function (err) {
         // 流式没拿到正文 → 用非流式再试一次
         return fetch(cfg.ep, {
           method: "POST",
@@ -611,7 +615,7 @@
             model: cfg.model,
             messages: msgs,
             temperature: 0.3,
-            max_tokens: 2000
+            max_tokens: 4000
           })
         }).then(function (r2) {
           return r2.text().then(function (t) {
@@ -886,16 +890,46 @@
     });
   }
 
+  /** 回答被长度截断时，让模型接着往下写（最多续 2 次） */
+  function continueAnswer(msgs, soFar, cfg, onDelta, depth) {
+    if (depth >= 2) return soFar;
+    var m2 = msgs.concat([
+      { role: "assistant", content: soFar },
+      { role: "user", content: "继续，从刚才断掉的地方接着写，不要重复前文，不要重新开场。" }
+    ]);
+    return fetch(cfg.ep, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: "Bearer " + cfg.key },
+      body: JSON.stringify({
+        model: cfg.model,
+        messages: m2,
+        temperature: 0.3,
+        max_tokens: 4000,
+        stream: true
+      })
+    }).then(function (r) {
+      if (!r.ok || !r.body) return soFar;
+      var base = soFar;
+      return readStream(r.body, function (piece, full) {
+        onDelta(piece, base + full);
+      }).then(function (res) {
+        var merged = base + res.text;
+        if (res.truncated) return continueAnswer(msgs, merged, cfg, onDelta, depth + 1);
+        return merged;
+      });
+    }).catch(function () { return soFar; });
+  }
+
   /** 逐块读取 SSE 流 */
   function readStream(body, onDelta) {
     var reader = body.getReader();
     var dec = new TextDecoder("utf-8");
-    var buf = "", full = "", raw = "";
+    var buf = "", full = "", raw = "", truncated = false;
     return new Promise(function (resolve, reject) {
       function pump() {
         reader.read().then(function (r) {
           if (r.done) {
-            if (full) { resolve(full); return; }
+            if (full) { resolve({ text: full, truncated: truncated }); return; }
             // 一个字都没拿到 → 把原始返回带出去，方便定位
             if (raw.trim()) {
               reject(new Error("返回里没有文字。原始内容：" + raw.slice(0, 300)));
@@ -915,7 +949,7 @@
             if (ln.indexOf("data:") !== 0) continue;
             var payload = ln.slice(5).trim();
             if (payload === "[DONE]") {
-              if (full) { resolve(full); }
+              if (full) { resolve({ text: full, truncated: truncated }); }
               else { reject(new Error("模型只返回了思考过程，没有正文")); }
               return;
             }
@@ -929,6 +963,8 @@
               // 思考型模型会先吐 reasoning_content，正文在 content；只取正文
               var piece = ch.content || "";
               if (piece) { full += piece; onDelta(piece, full); }
+              var fr = ((j.choices || [])[0] || {}).finish_reason;
+              if (fr === "length") truncated = true;
             } catch (e) {}
           }
           pump();
