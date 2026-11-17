@@ -450,8 +450,22 @@
       '</div>' +
       // 设置
       '<div class="mm-set" id="mmSet" hidden>' +
-        '<label><input type="checkbox" id="mmScriptChk"> 允许自定义脚本（js: 开头）</label>' +
-        '<div class="mm-warn">开启后，以 js: 开头的命令会真的在页面里运行，能读写任何数据。每次执行前还会再确认一次。</div>' +
+        '<div class="mm-seg">' +
+          '<button type="button" class="mm-seg-b" data-mode="offline">离线</button>' +
+          '<button type="button" class="mm-seg-b" data-mode="online">联网</button>' +
+        '</div>' +
+        '<div class="mm-api" id="mmApi" hidden>' +
+          '<input id="mmEp" placeholder="接口地址 https://api.deepseek.com/chat/completions">' +
+          '<input id="mmModel" placeholder="模型 deepseek-flash">' +
+          '<input id="mmKey" type="password" placeholder="API Key">' +
+          '<div class="mm-apibtn">' +
+            '<button type="button" class="mm-mini-btn" id="mmTest">测试</button>' +
+            '<button type="button" class="mm-mini-btn pri" id="mmSave">保存</button>' +
+          '</div>' +
+          '<div class="mm-apimsg" id="mmApiMsg"></div>' +
+        '</div>' +
+        '<label class="mm-scriptline"><input type="checkbox" id="mmScriptChk"> 允许自定义脚本（js: 开头）</label>' +
+        '<div class="mm-warn">开启后，以 js: 开头的命令会真的在页面里运行。每次执行前还会再确认一次。</div>' +
       '</div>' +
       // 消息
       '<div class="mm-list" id="mmList"></div>' +
@@ -498,6 +512,99 @@
     };
     box.querySelector("#mmGear").onclick = function () {
       setBox.hidden = !setBox.hidden;
+      if (!setBox.hidden) refreshSettings();
+    };
+
+    // ===== 模式切换 =====
+    var SAVE_KEY = "luoke.miao.cfg";
+    function loadCfg() {
+      try { return JSON.parse(localStorage.getItem(SAVE_KEY) || "{}"); } catch (e) { return {}; }
+    }
+    function storeCfg(o) {
+      try { localStorage.setItem(SAVE_KEY, JSON.stringify(o)); } catch (e) {}
+    }
+
+    function refreshSettings() {
+      var c = loadCfg();
+      // 模式按钮高亮
+      Array.prototype.forEach.call(box.querySelectorAll(".mm-seg-b"), function (b) {
+        b.classList.toggle("on", b.getAttribute("data-mode") === mode);
+      });
+      // 联网字段
+      box.querySelector("#mmApi").hidden = mode !== "online";
+      if (c.ep) box.querySelector("#mmEp").value = c.ep;
+      if (c.model) box.querySelector("#mmModel").value = c.model;
+      if (c.key) box.querySelector("#mmKey").value = c.key;
+      // 首次打开时，从截图识别的配置里带过来
+      if (!c.ep) {
+        try {
+          var ocr = JSON.parse(localStorage.getItem("luoke-ocr-cfg") || "{}");
+          if (ocr.endpoint) box.querySelector("#mmEp").value = ocr.endpoint;
+          if (ocr.model) box.querySelector("#mmModel").value = ocr.model;
+          if (ocr.key) box.querySelector("#mmKey").value = ocr.key;
+        } catch (e) {}
+      }
+      if (!box.querySelector("#mmEp").value) box.querySelector("#mmEp").value = "https://api.deepseek.com/chat/completions";
+      if (!box.querySelector("#mmModel").value) box.querySelector("#mmModel").value = "deepseek-flash";
+    }
+
+    Array.prototype.forEach.call(box.querySelectorAll(".mm-seg-b"), function (b) {
+      b.onclick = function () {
+        var m = b.getAttribute("data-mode");
+        if (m === "online") {
+          var c = loadCfg();
+          if (!c.key) {
+            box.querySelector("#mmApi").hidden = false;
+            msg3("填好地址/模型/Key 后点「保存」再切联网");
+          }
+        }
+        setMode(m);
+        refreshSettings();
+      };
+    });
+
+    function msg3(t, bad) {
+      var el = box.querySelector("#mmApiMsg");
+      if (el) { el.textContent = t; el.className = "mm-apimsg" + (bad ? " bad" : ""); }
+    }
+
+    box.querySelector("#mmSave").onclick = function () {
+      var ep = (box.querySelector("#mmEp").value || "").trim();
+      var model = (box.querySelector("#mmModel").value || "").trim();
+      var key = (box.querySelector("#mmKey").value || "").trim().replace(/^Bearer\s+/i, "");
+      if (/^https?:\/\/[^/]+\/?$/.test(ep)) ep = ep.replace(/\/$/, "") + "/chat/completions";
+      if (!ep || !model || !key) return msg3("三项都要填", true);
+      cfg = { ep: ep, model: model, key: key };
+      storeCfg(cfg);
+      setMode("online", cfg);
+      refreshSettings();
+      msg3("已保存，已切到联网");
+    };
+
+    box.querySelector("#mmTest").onclick = function () {
+      var ep = (box.querySelector("#mmEp").value || "").trim();
+      var model = (box.querySelector("#mmModel").value || "").trim();
+      var key = (box.querySelector("#mmKey").value || "").trim().replace(/^Bearer\s+/i, "");
+      if (/^https?:\/\/[^/]+\/?$/.test(ep)) ep = ep.replace(/\/$/, "") + "/chat/completions";
+      if (!ep || !model || !key) return msg3("三项都要填", true);
+      msg3("测试中…");
+      fetch(ep, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: "Bearer " + key },
+        body: JSON.stringify({ model: model, messages: [{ role: "user", content: "只回复两个字：可用" }], max_tokens: 16, temperature: 0 })
+      }).then(function (r) {
+        return r.text().then(function (t) { return { ok: r.ok, status: r.status, t: t }; });
+      }).then(function (res) {
+        if (res.ok) {
+          var j2 = null; try { j2 = JSON.parse(res.t); } catch (e) {}
+          var txt = (((j2 || {}).choices || [])[0] || {}).message;
+          msg3("✓ 连接成功：" + (txt && txt.content ? txt.content.slice(0, 20) : "可用"));
+        } else {
+          var j3 = null; try { j3 = JSON.parse(res.t); } catch (e) {}
+          var em = (j3 && j3.error && j3.error.message) || res.t.slice(0, 120);
+          msg3("✗ HTTP " + res.status + "：" + em, true);
+        }
+      }).catch(function (e) { msg3("✗ 连不上：" + e.message, true); });
     };
 
     // 发送
@@ -602,6 +709,17 @@
 
   function open(opts) {
     build();
+    // 恢复上次使用的模式
+    if (!opts || !opts.mode) {
+      try {
+        var saved = JSON.parse(localStorage.getItem("luoke.miao.cfg") || "{}");
+        if (saved.mode === "online" && saved.ep && saved.key) {
+          setMode("online", { ep: saved.ep, model: saved.model, key: saved.key });
+        } else {
+          setMode("offline");
+        }
+      } catch (e) {}
+    }
     box.style.display = "flex";
     var fab = document.getElementById("mmFab");
     if (fab) fab.style.display = "none";
@@ -619,6 +737,12 @@
   function setMode(m, c) {
     mode = m === "online" ? "online" : "offline";
     if (c) cfg = c;
+    try {
+      var saved = JSON.parse(localStorage.getItem("luoke.miao.cfg") || "{}");
+      saved.mode = mode;
+      if (c) { saved.ep = c.ep; saved.model = c.model; saved.key = c.key; }
+      localStorage.setItem("luoke.miao.cfg", JSON.stringify(saved));
+    } catch (e) {}
     var el = document.getElementById("mmMode");
     if (el) el.textContent = mode === "online" ? "联网·大模型" : "离线·内置数据";
     var dot = document.getElementById("mmLive");
