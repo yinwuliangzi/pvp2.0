@@ -3336,14 +3336,25 @@
    * 规则：≥5 只 · 全部能在精灵库解析 · 无重复 · 解析率 ≥0.8
    */
   function validateTeam(pets) {
+    var moveSets = [];
     var raw = (pets || []).map(function (x) {
-      return typeof x === "string" ? x : (x && (x.n || x.name || x.pet)) || "";
-    }).map(function (s) { return String(s).trim(); }).filter(Boolean);
-    var canon = [], miss = [], how = [];
-    raw.forEach(function (r) {
+      var nm = typeof x === "string" ? x : (x && (x.n || x.name || x.pet)) || "";
+      var mv = (x && Array.isArray(x.moves)) ? x.moves.filter(Boolean).slice(0, 4) : [];
+      moveSets.push(mv);
+      return String(nm).trim();
+    }).filter(function (s, i) {
+      if (!s) { moveSets.splice(i, 1); return false; }
+      return true;
+    });
+    var canon = [], canonMoves = [], miss = [], how = [];
+    raw.forEach(function (r, idx) {
       var c = canonName(r);
-      if (c.n) { if (canon.indexOf(c.n) < 0) { canon.push(c.n); how.push(c.how); } }
-      else miss.push(r);
+      if (c.n) {
+        if (canon.indexOf(c.n) < 0) {
+          canon.push(c.n); how.push(c.how);
+          canonMoves.push((moveSets[idx] || []).filter(Boolean).slice(0, 4));
+        }
+      } else miss.push(r);
     });
     var unique = canon.length;
     var ratio = raw.length ? unique / raw.length : 0;
@@ -3357,6 +3368,8 @@
       unique: unique, ratio: Math.round(ratio * 100) / 100,
       miss: miss, fixed: how.filter(function (h) { return h !== "精确"; }),
       sig: teamSig(canon.slice(0, 6)),
+      moves: canonMoves.slice(0, 6),
+      withMoves: canonMoves.filter(function (m) { return m && m.length; }).length,
       reason: ok ? "通过" : reasons.join("；")
     };
   }
@@ -3364,6 +3377,7 @@
   /** 存队伍（带检验 + 签名去重 + 投票累加） */
   function saveTeamValidated(name, pets, extra) {
     var v = validateTeam(pets);
+    var extraMoves = (extra && extra.moves) || null;
     if (!v.ok) return { ok: false, msg: "未通过检验：" + v.reason, check: v };
     var list = loadTeams();
     var hit = list.filter(function (t) { return t.sig === v.sig; })[0];
@@ -3371,6 +3385,9 @@
       hit.votes = (hit.votes || 1) + 1;
       hit.lastAt = Date.now();
       hit.sources = hit.sources || [];
+      if ((!hit.moves || !hit.moves.length || hit.moves.every(function (m) { return !m || !m.length; })) && (extraMoves || v.moves)) {
+        hit.moves = extraMoves || v.moves;
+      }
       if (extra && extra.note) hit.sources.push(String(extra.note).slice(0, 90));
       if (hit.sources.length > 8) hit.sources = hit.sources.slice(-8);
       saveTeams(list);
@@ -3380,7 +3397,7 @@
       id: newTeamId(),
       name: String(name || "").trim() || (v.pets.slice(0, 2).join("·") + "队"),
       pets: v.pets,
-      moves: [], hp: [],
+      moves: extraMoves || v.moves || [], hp: [],
       src: (extra && extra.src) || "识别",
       note: (extra && extra.note) || "",
       sig: v.sig, votes: 1, at: Date.now(),
@@ -3791,13 +3808,14 @@
   window.__openCollectConfig = openCollectConfig;
 
   /** 原地更新一套队伍（保留 id / 票数 / 来源） */
-  function updateTeam(id, name, pets) {
+  function updateTeam(id, name, pets, moves) {
     var list = loadTeams();
     var t = list.filter(function (x) { return x.id === id; })[0];
     if (!t) return { ok: false, msg: "找不到这套队伍" };
     var v = validateTeam(pets);
     if (!v.ok) return { ok: false, msg: v.reason, check: v };
     t.pets = v.pets;
+    t.moves = moves || v.moves || [];
     t.sig = v.sig;
     if (name != null && String(name).trim()) t.name = String(name).trim();
     t.fixed = v.fixed;
@@ -3820,7 +3838,13 @@
       '<button type="button" class="teams-x" id="manClose">×</button></div>' +
       '<div class="cfg-body">' +
       '  <div class="cfg-row"><label>队名</label><input id="manName" class="man-input" value="' + String(t.name || "").replace(/"/g, "&quot;") + '"></div>' +
-      '  <div class="cfg-row"><label>精灵</label><textarea id="manPets" rows="3">' + t.pets.join("、") + "</textarea></div>" +
+      '  <div class="cfg-row"><label>精灵 + 招式</label><div class="mv-list" id="mvList">' +
+      (t.pets.length ? t.pets : ["", "", "", "", "", ""]).map(function (n, i) {
+        var mv = ((t.moves || [])[i] || []).join("、");
+        return '<div class="mv-row"><span class="mv-idx">' + (i + 1) + '</span>' +
+          '<input class="mv-pet" value="' + String(n || "").replace(/"/g, "&quot;") + '" placeholder="精灵名">' +
+          '<input class="mv-moves" value="' + mv.replace(/"/g, "&quot;") + '" placeholder="招式，逗号分隔（可空）"></div>';
+      }).join("") + "</div></div>" +
       '  <div class="man-preview" id="manPreview"></div>' +
       '  <div class="teams-bar" style="border:0;padding:0"><button type="button" class="teams-btn primary" id="manSave">保存修改</button>' +
       '  <button type="button" class="teams-btn" id="manDelete" style="color:#C9503C">删除这套</button></div>' +
@@ -3828,21 +3852,34 @@
     document.body.appendChild(mask);
     mask.querySelector("#manClose").onclick = function () { mask.remove(); };
     mask.onclick = function (e) { if (e.target === mask) mask.remove(); };
-    function parse() {
-      return String(mask.querySelector("#manPets").value || "")
-        .split(/[、,，;；\s\n]+/).map(function (s) { return s.trim(); }).filter(Boolean).slice(0, 6);
+    function rows() {
+      var out = [];
+      Array.prototype.forEach.call(mask.querySelectorAll("#mvList .mv-row"), function (r) {
+        var pet = String((r.querySelector(".mv-pet") || {}).value || "").trim();
+        if (!pet) return;
+        var mv = String((r.querySelector(".mv-moves") || {}).value || "")
+          .split(/[、,，;；]+/).map(function (s) { return s.trim(); }).filter(Boolean).slice(0, 4);
+        out.push({ n: pet, moves: mv });
+      });
+      return out;
     }
     function preview() {
-      var v = validateTeam(parse());
+      var v = validateTeam(rows());
+      var mvCount = v.withMoves || 0;
       mask.querySelector("#manPreview").innerHTML = v.ok
-        ? '<div class="man-ok">✓ ' + v.pets.join("、") + (v.fixed.length ? "（纠正 " + v.fixed.join(",") + "）" : "") + "</div>"
+        ? '<div class="man-ok">✓ ' + v.pets.join("、") +
+          (mvCount ? '　<span class="mv-badge">' + mvCount + " 只带配招</span>" : "") +
+          (v.fixed.length ? "（纠正 " + v.fixed.join(",") + "）" : "") + "</div>"
         : '<div class="man-bad">✗ ' + v.reason + "</div>" +
           (v.miss.length ? '<div class="man-miss">未收录：' + v.miss.join("、") + "</div>" : "");
     }
-    mask.querySelector("#manPets").addEventListener("input", preview);
+    Array.prototype.forEach.call(mask.querySelectorAll("#mvList input"), function (inp) {
+      inp.addEventListener("input", preview);
+    });
     preview();
     mask.querySelector("#manSave").onclick = function () {
-      var r = updateTeam(id, mask.querySelector("#manName").value, parse());
+      var rs = rows();
+      var r = updateTeam(id, mask.querySelector("#manName").value, rs, rs.map(function (x) { return x.moves; }));
       if (r.ok) { mask.remove(); showToast("已保存：" + r.team.name); if (window.__refreshTeamsList) window.__refreshTeamsList(); }
       else alert(r.msg);
     };
@@ -3934,6 +3971,189 @@
 
   window.__openManualTeam = openManualTeam;
 
+  /* ============ 配队推荐书 ============ */
+  function generateReport(opt) {
+    var o = opt || {};
+    var all = loadTeams();
+    var mines = all.filter(function (t) { return t.side === "mine"; });
+    var foes = all.filter(function (t) { return t.side !== "mine"; });
+
+    // 没有存我方队伍 → 用当前我方算一套
+    if (!mines.length) {
+      var cur = ((state.mine.slots || []).filter(Boolean)).slice(0, 6);
+      if (cur.length >= 4) {
+        mines = [{ id: "__cur", name: "当前我方", pets: cur, moves: [], sig: teamSig(cur), votes: 1 }];
+      }
+    }
+    if (!mines.length) return { ok: false, msg: "先在计算器里配好我方 6 只，或存几套我方队伍" };
+    if (!foes.length) return { ok: false, msg: "队伍库里没有对手队伍，先去存几套" };
+
+    var cmp = compareMyTeams(mines.map(function (m) { return m.id; }).filter(function (id) { return id !== "__cur"; }),
+                             null, { games: o.games || 80 });
+    // __cur 不在库里时自己算
+    if (!cmp.ok) {
+      var rows = mines.map(function (m) {
+        var pairs = foes.map(function (f) {
+          var r = evalPair(m.pets, f, { games: o.games || 80 });
+          return { foe: f.name, mc: r.mcPct || 0, diff: r.avgDiff || 0, error: r.error };
+        });
+        var ok = pairs.filter(function (x) { return !x.error; });
+        var avgMc = ok.length ? ok.reduce(function (a, b) { return a + b.mc; }, 0) / ok.length : 0;
+        var avgDiff = ok.length ? ok.reduce(function (a, b) { return a + b.diff; }, 0) / ok.length : 0;
+        return { name: m.name, pets: m.pets, avgMc: Math.round(avgMc * 10) / 10, avgDiff: Math.round(avgDiff * 100) / 100,
+                 beat: ok.filter(function (x) { return x.mc >= 50; }).length, total: ok.length, pairs: pairs };
+      });
+      rows.sort(function (a, b) { return b.avgMc - a.avgMc; });
+      cmp = { ok: true, rows: rows };
+    }
+
+    var best = cmp.rows[0];
+    var checks = {};
+    cmp.rows.forEach(function (r) {
+      checks[r.name] = evaluateTeam({ team: r.pets, forceSim: false });
+    });
+
+    var L = [];
+    var d = new Date();
+    L.push("# 配队推荐书");
+    L.push("");
+    L.push("生成时间：" + d.getFullYear() + "-" + pad2(d.getMonth() + 1) + "-" + pad2(d.getDate()) + " " +
+      pad2(d.getHours()) + ":" + pad2(d.getMinutes()));
+    L.push("评估范围：" + cmp.rows.length + " 套我方 × " + foes.length + " 套对手（" + foes.map(function (f) { return f.name; }).join("、") + "）");
+    L.push("");
+
+    L.push("## 一、排名");
+    L.push("");
+    L.push("| # | 我方队伍 | 平均胜率 | 平均对位差 | 胜场 | 配队评级 |");
+    L.push("|---|---|---|---|---|---|");
+    cmp.rows.forEach(function (r, i) {
+      var ck = checks[r.name] || {};
+      L.push("| " + (i + 1) + " | " + r.name + " | " + r.avgMc + "% | " + (r.avgDiff > 0 ? "+" : "") + r.avgDiff +
+        " | " + r.beat + "/" + r.total + " | " + (ck.grade || "-") + " " + (ck.score != null ? ck.score + "分" : "") + " |");
+    });
+    L.push("");
+
+    L.push("## 二、推荐");
+    L.push("");
+    L.push("**首选：" + best.name + "**");
+    L.push("");
+    L.push("- 平均胜率 " + best.avgMc + "% · 对位差 " + (best.avgDiff > 0 ? "+" : "") + best.avgDiff +
+      " · " + best.beat + "/" + best.total + " 套对手能赢");
+    var bck = checks[best.name];
+    if (bck && bck.items) {
+      L.push("- 配队评级 " + bck.grade + "（" + bck.score + " 分）");
+      var strong = bck.items.filter(function (x) { return x.score / x.max >= 0.8; });
+      if (strong.length) L.push("- 强项：" + strong.map(function (x) { return x.name + "（" + x.score + "/" + x.max + "）"; }).join("、"));
+    }
+    L.push("");
+
+    L.push("## 三、各套短板");
+    L.push("");
+    cmp.rows.forEach(function (r) {
+      var ck = checks[r.name];
+      L.push("### " + r.name);
+      L.push("");
+      if (!ck || !ck.ok) { L.push("- 无法评估"); L.push(""); return; }
+      if (ck.issues.length) ck.issues.forEach(function (x) { L.push("- " + x); });
+      else L.push("- 没有明显短板");
+      if (r.pairs && r.pairs.length) {
+        var worst = r.pairs.slice().filter(function (x) { return x.mc != null && !x.error; })
+          .sort(function (a, b) { return a.mc - b.mc; })[0];
+        if (worst && worst.mc < 60) L.push("- 最怕：" + worst.foe + "（仅 " + worst.mc + "%）");
+        else if (worst) L.push("- 对所有对手胜率都在 60% 以上（最低 " + worst.foe + " " + worst.mc + "%）");
+      }
+      L.push("");
+    });
+
+    L.push("## 四、怎么改");
+    L.push("");
+    var fixes = [];
+    var bIssues = (bck && bck.issues) || [];
+    bIssues.forEach(function (t) {
+      if (/怕「(.+?)」/.test(t)) {
+        var ty = /怕「(.+?)」/.exec(t)[1];
+        fixes.push("补一只抗「" + ty + "」的精灵，或把被克的替换掉");
+      } else if (/先手/.test(t)) {
+        fixes.push("补一只速度 ≥110 的先手位，否则全程被动");
+      } else if (/同属性/.test(t)) {
+        fixes.push("拆开同属性堆叠，避免弱点重叠");
+      } else if (/攻击面太窄/.test(t)) {
+        fixes.push("补一个不同攻击属性的输出位，扩大克制面");
+      } else if (/胜率/.test(t)) {
+        fixes.push("针对最怕的那套对手做专项调整（换精灵或改招式）");
+      } else {
+        fixes.push(t);
+      }
+    });
+    if (!fixes.length) fixes.push("当前首套配队结构完整，建议保持并微调招式");
+    fixes = fixes.filter(function (x, i, a) { return a.indexOf(x) === i; });
+    fixes.forEach(function (x, i) { L.push((i + 1) + ". " + x); });
+    L.push("");
+
+    L.push("## 五、最怕的对手");
+    L.push("");
+    var fragility = [];
+    cmp.rows.forEach(function (r) {
+      (r.pairs || []).forEach(function (p) {
+        if (p.mc != null && p.mc < 50) fragility.push({ my: r.name, foe: p.foe, mc: p.mc });
+      });
+    });
+    fragility.sort(function (a, b) { return a.mc - b.mc; });
+    if (fragility.length) {
+      fragility.slice(0, 6).forEach(function (f) { L.push("- " + f.my + " 打 " + f.foe + " 只有 " + f.mc + "%"); });
+    } else {
+      L.push("- 所有我方队伍对所有对手胜率都在 50% 以上");
+    }
+    L.push("");
+    L.push("---");
+    L.push("数据来源：本地伤害引擎（含特性/印记/道具/天气）+ 蒙特卡洛模拟");
+
+    return { ok: true, markdown: L.join("\n"), best: best.name, rows: cmp.rows.length };
+  }
+
+  function openReport() {
+    var old = document.getElementById("repMask");
+    if (old) old.remove();
+    var mask = document.createElement("div");
+    mask.id = "repMask";
+    mask.className = "teams-mask";
+    mask.innerHTML = '<div class="teams-box" style="width:min(720px,100%)">' +
+      '<div class="teams-hd"><b>配队推荐书</b><span class="teams-sub">哪套最强 · 怕什么 · 怎么改</span>' +
+      '<button type="button" class="teams-x" id="repClose">×</button></div>' +
+      '<div class="teams-bar"><button type="button" class="teams-btn primary" id="repRun">生成</button>' +
+      '<button type="button" class="teams-btn" id="repCopy">复制</button>' +
+      '<button type="button" class="teams-btn" id="repSave">下载 .md</button></div>' +
+      '<div class="rep-body" id="repBody"><div class="teams-empty">点「生成」开始</div></div></div>';
+    document.body.appendChild(mask);
+    mask.querySelector("#repClose").onclick = function () { mask.remove(); };
+    mask.onclick = function (e) { if (e.target === mask) mask.remove(); };
+    var md = "";
+    mask.querySelector("#repRun").onclick = function () {
+      var body = mask.querySelector("#repBody");
+      body.innerHTML = '<div class="teams-loading">正在评估…</div>';
+      setTimeout(function () {
+        var r = generateReport({ games: 80 });
+        if (!r.ok) { body.innerHTML = '<div class="teams-empty">' + r.msg + "</div>"; return; }
+        md = r.markdown;
+        body.innerHTML = '<pre class="rep-md">' + md.replace(/</g, "&lt;") + "</pre>";
+      }, 40);
+    };
+    mask.querySelector("#repCopy").onclick = function () {
+      if (!md) { alert("先点「生成」"); return; }
+      if (navigator.clipboard) navigator.clipboard.writeText(md).then(function () { showToast("已复制"); });
+    };
+    mask.querySelector("#repSave").onclick = function () {
+      if (!md) { alert("先点「生成」"); return; }
+      var blob = new Blob([md], { type: "text/markdown" });
+      var a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = "配队推荐书-" + todayStr(0) + ".md";
+      a.click();
+    };
+  }
+
+  window.__openReport = openReport;
+
   /* ============ 我方多套对比面板 ============ */
   function openCompare() {
     var old = document.getElementById("cmpMask");
@@ -3997,6 +4217,7 @@
       '    <button type="button" class="teams-btn" id="teamsManual">手动录入</button>',
       '    <button type="button" class="teams-btn alt" id="teamsSaveMine">存我方队伍</button>',
       '    <button type="button" class="teams-btn alt" id="teamsCompare">我方对比</button>',
+      '    <button type="button" class="teams-btn primary" id="teamsReport">推荐书</button>',
       '    <button type="button" class="teams-btn" id="teamsImportFile">导入采集结果</button>',
       '    <button type="button" class="teams-btn" id="teamsCover">封面识别</button>',
       '    <button type="button" class="teams-btn" id="teamsFrames">视频帧识别</button>',
@@ -4070,6 +4291,7 @@
       else alert(r.msg);
     };
     mask.querySelector("#teamsCompare").onclick = function () { openCompare(); };
+    mask.querySelector("#teamsReport").onclick = function () { openReport(); };
     mask.querySelector("#teamsCheck").onclick = function () { openTeamCheck(); };
     mask.querySelector("#teamsCfg").onclick = function () { openCollectConfig(); };
     mask.querySelector("#teamsFrames").onclick = function () {
@@ -4595,10 +4817,10 @@
     listTeams: function (side) {
       var all = loadTeams();
       var f = side ? all.filter(function (t) { return (t.side || "foe") === side; }) : all;
-      return { ok: true, teams: f.map(function (t) { return { id: t.id, name: t.name, pets: t.pets, src: t.src, side: t.side || "foe", votes: t.votes || 1, sig: t.sig || "" }; }) };
+      return { ok: true, teams: f.map(function (t) { return { id: t.id, name: t.name, pets: t.pets, moves: t.moves || [], src: t.src, side: t.side || "foe", votes: t.votes || 1, sig: t.sig || "" }; }) };
     },
     saveMyTeam: function (name) { return myTeamsSave(name); },
-    updateTeam: function (id, name, pets) { return updateTeam(id, name, pets); },
+    updateTeam: function (id, name, pets, moves) { return updateTeam(id, name, pets, moves); },
     compareMyTeams: function (myIds, foeIds, opt) { return compareMyTeams(myIds, foeIds, opt); },
     loadTeam: function (id) { return teamsLoad(id); },
     deleteTeam: function (id) { return teamsDelete(id); },

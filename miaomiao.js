@@ -2608,7 +2608,8 @@
     "2) 「一图流」配队图：网格排列的精灵头像+名字",
     "3) 开场阵容预览：一排精灵头像",
     "如果有，输出 JSON（只输出 JSON，不要解释）：",
-    '{"pets":["精灵名1","精灵名2","精灵名3","精灵名4"],"confidence":"high或low","note":"来源"}\n',
+    '{"pets":[{"name":"精灵名1","moves":["招式1","招式2"]},{"name":"精灵名2","moves":[]}],"confidence":"high或low","note":"来源"}\n',
+    "如果有招式名（技能栏、配招区）一并写进 moves，看不清就留空数组。",
     "",
     "规则：",
     "- 只认精灵名，别把招式名、玩家名、弹幕文字算进去",
@@ -2620,7 +2621,8 @@
   var COVER_PROMPT = [
     "这是洛克王国的视频封面/一图流。",
     "如果图里列出了精灵队伍（通常 4-8 只精灵名，可能带招式），按下面格式只输出 JSON，不要任何解释：",
-    '{"pets":["精灵名1","精灵名2","精灵名3","精灵名4"],"confidence":"high或low","note":"补充说明"}',
+    '{"pets":[{"name":"精灵名1","moves":["招式1","招式2"]},{"name":"精灵名2","moves":[]}],"confidence":"high或low","note":"补充说明"}',
+    "如果封面上写了招式，一并放进 moves；没有就留空数组。",
     "规则：",
     "- 只认精灵名，不要招式名、不要玩家名、不要标题文字",
     "- 看不清或图里没有精灵列表 → 输出 {\"pets\":[],\"confidence\":\"low\",\"note\":\"图里没有队伍\"}",
@@ -2798,7 +2800,11 @@
           })
           .then(function (txt) {
             var data = extractImageData(txt);
-            var pets = (data && data.pets) || [];
+            var rawPets = (data && data.pets) || [];
+            var pets = rawPets.map(function (x) { return typeof x === "string" ? x : (x && x.name) || ""; }).filter(Boolean);
+            var petMoves = rawPets.map(function (x) {
+              return (x && Array.isArray(x.moves)) ? x.moves.filter(Boolean).slice(0, 4) : [];
+            });
             // 校验没过 → 用严格模式重试一次
             if (pets.length < 4 || !(window.MiaoBridge && window.MiaoBridge.validateTeam && window.MiaoBridge.validateTeam(pets).ok)) {
               return urlToDataUrl(it.cover)
@@ -2822,13 +2828,15 @@
             var b = bridge();
             var nm = pets.slice(0, 2).join("·") + "队" + (it.bvid ? "(" + String(it.bvid).slice(2, 8) + ")" : "");
             var note = (it.title || "") + (it.bvid ? " · " + it.bvid : "");
+            var withMv = pets.map(function (p2, ii) { return { n: p2, moves: petMoves[ii] || [] }; });
             var r = b && b.saveTeamValidated
-              ? b.saveTeamValidated(nm, pets, { src: isFrame ? "视频帧" : "封面", note: note })
+              ? b.saveTeamValidated(nm, withMv, { src: isFrame ? "视频帧" : "封面", note: note, moves: petMoves })
               : { ok: false, msg: "检验接口未就绪" };
             if (r && r.ok) {
               ok++;
               line.className = "cover-line done";
               line.textContent = (r.merged ? "✓ 重复队（证据 " + r.votes + "）" : "✓ " + r.team.name + "：" + r.check.pets.join("、")) +
+                (r.check.withMoves ? "　[" + r.check.withMoves + "只带配招]" : "") +
                 (r.check.fixed && r.check.fixed.length ? "（纠正 " + r.check.fixed.length + "）" : "");
               var eb = document.createElement("button");
               eb.type = "button";
