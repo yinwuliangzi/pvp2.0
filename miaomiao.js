@@ -2416,6 +2416,56 @@
     });
   }
 
+  /** 给帧打「疑似配队画面」分：深色面板 + 文字边缘多 → 高分
+   *  场下精灵面板 = 中央半透明深色矩形 + 白色文字，用它做启发式 */
+  function scoreFrameImage(img) {
+    try {
+      var W = 160, H = 90;
+      var cv = document.createElement("canvas");
+      cv.width = W; cv.height = H;
+      var g = cv.getContext("2d", { willReadFrequently: true });
+      g.drawImage(img, 0, 0, W, H);
+      var px = g.getImageData(0, 0, W, H).data;
+      var x0 = Math.floor(W * 0.32), x1 = Math.floor(W * 0.68);
+      var y0 = Math.floor(H * 0.18), y1 = Math.floor(H * 0.88);
+      var lum = new Float32Array(W * H);
+      for (var y = 0; y < H; y++) {
+        for (var x = 0; x < W; x++) {
+          var i = (y * W + x) * 4;
+          lum[y * W + x] = px[i] * 0.299 + px[i + 1] * 0.587 + px[i + 2] * 0.114;
+        }
+      }
+      var sum = 0, n = 0, edge = 0, bright = 0;
+      for (var yy = y0; yy < y1; yy++) {
+        for (var xx = x0; xx < x1; xx++) {
+          var k = yy * W + xx;
+          var L = lum[k];
+          sum += L; n++;
+          if (L > 210) bright++;
+          if (xx > x0 && Math.abs(L - lum[k - 1]) > 42) edge++;
+          if (yy > y0 && Math.abs(L - lum[k - W]) > 42) edge++;
+        }
+      }
+      if (!n) return 0;
+      var dark = 1 - (sum / n) / 255;          // 越暗越高
+      var edgeRate = edge / (n * 2);           // 文字边缘密度
+      var brightRate = bright / n;             // 白字占比
+      // 深色底 + 有字 → 像 UI 面板
+      var score = dark * 0.45 + Math.min(edgeRate * 4, 1) * 0.35 + Math.min(brightRate * 6, 1) * 0.2;
+      return Math.round(score * 100);
+    } catch (e) { return 0; }
+  }
+
+  /** 加载图片（同源，可直接 canvas） */
+  function loadImg(url) {
+    return new Promise(function (resolve, reject) {
+      var im = new Image();
+      im.onload = function () { resolve(im); };
+      im.onerror = reject;
+      im.src = url;
+    });
+  }
+
   var FRAME_PROMPT = [
     "这是洛克王国对战的游戏画面。请找出画面里有没有精灵名单。",
     "常见形式：",
@@ -2490,6 +2540,38 @@
             ? '还没有抽帧。先在本机跑：<br><code>node tools/bili-frames.mjs --from-collected --limit 3</code>'
             : '采集结果里没有封面。先在本机跑：<br><code>node tools/bili-collect.mjs</code>') + '</div>';
           status.textContent = "";
+          return;
+        }
+        if (isFrame) {
+          // 先渲染占位，再逐张评分排序
+          grid.innerHTML = items.map(function (x, i) {
+            return '<label class="cover-item" data-i="' + i + '">' +
+              '<input type="checkbox" value="' + i + '">' +
+              '<img src="' + x.cover + '" loading="lazy" alt="">' +
+              '<span class="cover-score"></span>' +
+              '<span class="cover-t">第 ' + ((Number(x.frame) || 0) + 1) + ' 帧</span></label>';
+          }).join("");
+          status.textContent = "分析画面中…（自动挑出像配队画面的）";
+          var scored = [];
+          Promise.all(items.map(function (x, i) {
+            return loadImg(x.cover).then(function (im) {
+              scored.push({ i: i, s: scoreFrameImage(im) });
+            }).catch(function () { scored.push({ i: i, s: 0 }); });
+          })).then(function () {
+            scored.sort(function (a, b) { return b.s - a.s; });
+            var cut = scored.length ? Math.max(scored[0].s * 0.55, 32) : 0;
+            var picked = 0;
+            scored.forEach(function (o) {
+              var lab = grid.querySelector('[data-i="' + o.i + '"]');
+              if (!lab) return;
+              var cb = lab.querySelector("input");
+              var sc = lab.querySelector(".cover-score");
+              sc.textContent = "疑似度 " + o.s;
+              lab.classList.add(o.s >= cut ? "hot" : "cold");
+              if (o.s >= cut && picked < 8) { cb.checked = true; picked++; }
+            });
+            status.textContent = "共 " + items.length + " 帧 · 已自动勾选最像配队的 " + picked + " 张（可自己改）";
+          });
           return;
         }
         grid.innerHTML = items.map(function (x, i) {

@@ -1,84 +1,52 @@
 {
- "generated": "2026-11-18T11:08:37.187Z",
+ "generated": "2026-11-18T12:11:32.016Z",
  "window": {
-  "days": 400,
-  "minPlay": 3000
+  "days": 150,
+  "minPlay": 4000
  },
  "keywords": [
-  "洛克王国 阵容",
-  "洛克王国 PVP",
-  "洛克王国 天梯",
-  "洛克王国 配队",
-  "洛克王国 世界 阵容",
-  "洛克王国 竞技场"
+  "洛克王国世界 阵容",
+  "洛克王国世界 PVP",
+  "洛克王国世界 配队",
+  "洛克王国世界 天梯",
+  "洛克王国世界 竞技场",
+  "洛克王国世界 对战"
  ],
- "videos": 12,
+ "videos": 26,
  "teams": [
   {
-   "name": "水灵·幻影荆棘队(1.1万播)",
+   "name": "水灵·布灵队(2.5万播)",
    "pets": [
     "水灵",
-    "幻影荆棘",
-    "圆号鱼",
-    "巨鼓象",
-    "炮米花"
-   ],
-   "src": "bili",
-   "confidence": "high",
-   "note": "新手友好，高手破防！一个视频看懂S5 PVP现状",
-   "evidence": {
-    "bvid": "BV15jsz6wEut",
-    "play": 10617,
-    "date": "2026-11-17"
-   }
-  },
-  {
-   "name": "阿布·喵喵队(2.6万播)",
-   "pets": [
-    "阿布",
-    "喵喵",
-    "恶魔狼王",
-    "恶魔狼",
-    "化蝶"
-   ],
-   "src": "bili",
-   "confidence": "low",
-   "note": "s5圣龙宝藏开启前提前教你阿布配队",
-   "evidence": {
-    "bvid": "BV1xWxX6ZEqA",
-    "play": 25573,
-    "date": "2026-11-04"
-   }
-  },
-  {
-   "name": "点点·贝古斯队(1.8万播)",
-   "pets": [
-    "点点",
-    "贝古斯",
-    "地鼠",
+    "布灵",
+    "飞飞钥",
     "岚鸟"
    ],
    "src": "bili",
    "confidence": "low",
-   "note": "【阵容推荐】疯狂银龙地武队，三分钟一把，暴力推全队！",
+   "note": "【洛克时报54.0】S4赛季竞技场PVP萌新、科研及热门阵容一图流，赛季还有最后一周，快来看看赛季末大家都在玩啥！",
    "evidence": {
-    "bvid": "BV1PVWX6mEwP",
-    "play": 17878,
-    "date": "2026-11-12"
+    "bvid": "BV1a8xK6TETn",
+    "play": 24515,
+    "date": "2026-10-27"
    }
   }
  ],
  "hotPets": [
   {
-   "n": "贝古斯",
-   "count": 2
+   "n": "水灵",
+   "count": 4
   },
   {
    "n": "恶魔狼",
-   "count": 2
+   "count": 3
   },
   {
    "n": "冥古龙",
+   "count": 2
+  },
+  {
+   "n": "火神",
    "count": 2
   },
   {
@@ -86,23 +54,43 @@
    "count": 2
   },
   {
-   "n": "水灵",
+   "n": "罗隐",
    "count": 2
   },
   {
-   "n": "阿布",
-   "count": 1
-  },
-  {
-   "n": "喵喵",
-   "count": 1
-  },
-  {
-   "n": "恶魔狼王",
+   "n": "长江豚",
    "count": 1
   },
   {
    "n": "化蝶",
+   "count": 1
+  },
+  {
+   "n": "雪巨人",
+   "count": 1
+  },
+  {
+   "n": "深蓝鲸",
+   "count": 1
+  },
+  {
+   "n": "彩蝶鲨",
+   "count": 1
+  },
+  {
+   "n": "布鲁斯",
+   "count": 1
+  },
+  {
+   "n": "布灵",
+   "count": 1
+  },
+  {
+   "n": "飞飞钥",
+   "count": 1
+  },
+  {
+   "n": "水蓝蓝",
    "count": 1
   },
   {
@@ -114,7 +102,15 @@
    "count": 1
   },
   {
-   "n": "罗隐",
+   "n": "加油蟹",
+   "count": 1
+  },
+  {
+   "n": "星星眼",
+   "count": 1
+  },
+  {
+   "n": "恶魔红钻",
    "count": 1
   },
   {
@@ -122,84 +118,174 @@
    "count": 1
   },
   {
-   "n": "地鼠",
-   "count": 1
-  },
-  {
-   "n": "滴溜豚",
-   "count": 1
-  },
-  {
-   "n": "多多",
-   "count": 1
-  },
-  {
-   "n": "幻影荆棘",
-   "count": 1
-  },
-  {
-   "n": "圆号鱼",
-   "count": 1
-  },
-  {
-   "n": "巨鼓象",
-   "count": 1
-  },
-  {
-   "n": "炮米花",
-   "count": 1
-  },
-  {
-   "n": "飞飞钥",
-   "count": 1
-  },
-  {
-   "n": "火神",
-   "count": 1
-  },
-  {
-   "n": "筑梦",
+   "n": "贝古斯",
    "count": 1
   }
  ],
  "evidence": [
   {
-   "bvid": "BV1y2456HECV",
-   "title": "两三分钟一把超解压！我研究出了新赛季的猛攻队 洛克王国世界",
-   "play": 48061,
+   "bvid": "BV1mz4v62EBr",
+   "title": "极致暴力！冥古龙猛攻狼王队横扫竞技场！",
+   "play": 108639,
    "pets": [
-    "贝古斯",
+    "冥古龙",
     "恶魔狼"
    ],
    "seqs": 0,
-   "cover": "https://i2.hdslb.com/bfs/archive/96349199708e6ecf0d370c454a8cb3b8dd211828.jpg"
+   "cover": "https://i2.hdslb.com/bfs/archive/5fcc8bfa1674be28bbcb6009c9a72b95ae3d8d98.jpg"
+  },
+  {
+   "bvid": "BV1KWH566EMt",
+   "title": "再吐口水我报警了！江豚黑猫队！",
+   "play": 62745,
+   "pets": [
+    "长江豚",
+    "水灵"
+   ],
+   "seqs": 0,
+   "cover": "https://i2.hdslb.com/bfs/archive/249c5027cb9c3c389309fbbff6530e986361f3e0.jpg"
+  },
+  {
+   "bvid": "BV15j4J67EmW",
+   "title": "【洛克时报56.0】S5赛季竞技场PVP萌新、科研及热门阵容一图流，圣龙乐园来了！来看赛季初冲分阵容",
+   "play": 52311,
+   "pets": [],
+   "seqs": 0,
+   "cover": "https://i2.hdslb.com/bfs/archive/8db13cfb72dda4848cc0192b9c7ddb4373fcdd40.jpg"
+  },
+  {
+   "bvid": "BV1APn86yEXD",
+   "title": "抱歉听桥也不是不能计算的",
+   "play": 50459,
+   "pets": [],
+   "seqs": 0,
+   "cover": "https://i0.hdslb.com/bfs/archive/afd831006f7c214ce94c02b3c1abc7a0cbdfc2c1.jpg"
+  },
+  {
+   "bvid": "BV19iWR6zEeN",
+   "title": "某些特性触发方式是不是有点幽默了？",
+   "play": 46137,
+   "pets": [],
+   "seqs": 0,
+   "cover": "https://i0.hdslb.com/bfs/archive/509286d7ba3e64c9f1bd1271bf4b9b7aa98f5f6c.jpg"
+  },
+  {
+   "bvid": "BV1fAnd6gEEG",
+   "title": "PVP课堂——谁能拦截终端恶魔狼",
+   "play": 41881,
+   "pets": [
+    "恶魔狼",
+    "化蝶",
+    "雪巨人"
+   ],
+   "seqs": 0,
+   "cover": "https://i0.hdslb.com/bfs/archive/8b550b03707b02f958e6b3a5aadcbc68298e115e.jpg"
+  },
+  {
+   "bvid": "BV1JKWg6pEAZ",
+   "title": "【洛克时报57.0】S5赛季竞技场PVP萌新、科研及热门阵容一图流，这下真能分出国一了！大家给喜欢的精灵打标了吗？",
+   "play": 41624,
+   "pets": [
+    "火神"
+   ],
+   "seqs": 0,
+   "cover": "https://i1.hdslb.com/bfs/archive/99f270a33fa1e6d93d4dc23f7d48d357e378664e.jpg"
+  },
+  {
+   "bvid": "BV1WTs36eEPt",
+   "title": "来讲讲毒队从s1到一直到现在的故事",
+   "play": 37959,
+   "pets": [],
+   "seqs": 0,
+   "cover": "https://i2.hdslb.com/bfs/archive/60fcc5322ca6c1b661486c8ae8a91f84af3ea307.jpg"
+  },
+  {
+   "bvid": "BV1TkWT6cEAV",
+   "title": "洛手S5的竞技场be like：",
+   "play": 37831,
+   "pets": [],
+   "seqs": 0,
+   "cover": "https://i1.hdslb.com/bfs/archive/b0c1437209ccd80d3f55d0e2b4cfa8683919e4e6.jpg"
   },
   {
    "bvid": "BV1fyWk61EgS",
    "title": "【洛克时报58.0】S5赛季竞技场PVP萌新、科研及热门阵容一图流，本人暂无出任英伟达CEO的计划，未来将继续更新洛克时报（）",
-   "play": 35229,
+   "play": 35277,
    "pets": [],
    "seqs": 0,
    "cover": "https://i2.hdslb.com/bfs/archive/ed8bcb12956b84ae201894a3ba5467598970efd8.jpg"
   },
   {
-   "bvid": "BV1xWxX6ZEqA",
-   "title": "s5圣龙宝藏开启前提前教你阿布配队",
-   "play": 25573,
+   "bvid": "BV1vD446TETu",
+   "title": "没人告诉我梦境队这么好玩啊",
+   "play": 33988,
    "pets": [
-    "阿布",
-    "喵喵",
-    "恶魔狼王",
-    "恶魔狼",
-    "化蝶"
+    "深蓝鲸",
+    "水灵"
    ],
    "seqs": 0,
-   "cover": "https://i1.hdslb.com/bfs/archive/e87116bfb844015a23aa2bd1cf656a6f5a04c53a.jpg"
+   "cover": "https://i0.hdslb.com/bfs/archive/a6771a82a3667a834a1e021345c9d4f21a5f6c4a.jpg"
+  },
+  {
+   "bvid": "BV1Zrxr61EHs",
+   "title": "【洛克时报55.0】S4赛季竞技场PVP萌新、科研及热门阵容一图流，赛季即将结束，我们S5见！",
+   "play": 29252,
+   "pets": [
+    "彩蝶鲨",
+    "岚鸟"
+   ],
+   "seqs": 0,
+   "cover": "https://i1.hdslb.com/bfs/archive/0c72b6a660c11313445cc6bd9f5f226809433471.jpg"
+  },
+  {
+   "bvid": "BV1BZHw6oENX",
+   "title": "【洛克时报53.0】S4赛季竞技场PVP萌新、科研及热门阵容一图流，所以说这个赛季末又是水队统治环境吗",
+   "play": 26543,
+   "pets": [
+    "布鲁斯",
+    "火神"
+   ],
+   "seqs": 0,
+   "cover": "https://i0.hdslb.com/bfs/archive/063a172298216472117446000f7765e308f20405.jpg"
+  },
+  {
+   "bvid": "BV1xesz6SEPG",
+   "title": "在竞技场偷偷用金镜子改性格假装满速恶魔狼的二人",
+   "play": 25715,
+   "pets": [
+    "恶魔狼"
+   ],
+   "seqs": 0,
+   "cover": "https://i0.hdslb.com/bfs/archive/5bc5c000d7796a6c5cc97cc0ad5565b5f645a085.jpg"
+  },
+  {
+   "bvid": "BV1a8xK6TETn",
+   "title": "【洛克时报54.0】S4赛季竞技场PVP萌新、科研及热门阵容一图流，赛季还有最后一周，快来看看赛季末大家都在玩啥！",
+   "play": 24515,
+   "pets": [
+    "水灵",
+    "布灵",
+    "飞飞钥",
+    "岚鸟"
+   ],
+   "seqs": 0,
+   "cover": "https://i1.hdslb.com/bfs/archive/65e9fdc01d0c12dcfcf4d259aeccc64e590d9bbd.jpg"
+  },
+  {
+   "bvid": "BV1kxsg6aEVc",
+   "title": "闺女闺女！你去处理一下疯狂水世界！",
+   "play": 22809,
+   "pets": [
+    "水蓝蓝",
+    "水灵"
+   ],
+   "seqs": 0,
+   "cover": "https://i2.hdslb.com/bfs/archive/1ee5498a39100768123b4bc82113054899a7be3e.jpg"
   },
   {
    "bvid": "BV134W56sExV",
    "title": "万受无疆铁桶阵容 有拖拉机的波多西是什么强度 洛克王国世界",
-   "play": 20847,
+   "play": 20867,
    "pets": [
     "波多西"
    ],
@@ -207,9 +293,17 @@
    "cover": "https://i2.hdslb.com/bfs/archive/53a17f9f1e2bda9ab9836249d539c0205b2ac385.jpg"
   },
   {
+   "bvid": "BV1RGnd6PELi",
+   "title": "本大王的又一个奇思妙想！",
+   "play": 20727,
+   "pets": [],
+   "seqs": 0,
+   "cover": "https://i1.hdslb.com/bfs/archive/3de415eb9356047371600542b940e336d768d668.jpg"
+  },
+  {
    "bvid": "BV1ExWR67E8N",
    "title": "【洛克王国秋风】全新冥古龙阵容教学，就是力气大！",
-   "play": 20435,
+   "play": 20488,
    "pets": [
     "冥古龙"
    ],
@@ -217,9 +311,27 @@
    "cover": "https://i2.hdslb.com/bfs/archive/0d3c686c1453f6fca8c6852ef379ed3ddeaf2696.jpg"
   },
   {
+   "bvid": "BV1mW4P64E7r",
+   "title": "bin的武器和青钢影都在世界赛场上打出过集锦操作，大伙觉得这两个英雄更能代表bin，哪个玩的更好？抗吧热议",
+   "play": 19588,
+   "pets": [],
+   "seqs": 0,
+   "cover": "https://i1.hdslb.com/bfs/archive/417be05ce31d1a1d2a96118ec578c0829bbaadc1.jpg"
+  },
+  {
+   "bvid": "BV17csG6tEe2",
+   "title": "北极熊看策划回答电鹿和罗隐在天梯过于强势：翻译一下就是暂时没觉得这个有多强！",
+   "play": 19261,
+   "pets": [
+    "罗隐"
+   ],
+   "seqs": 0,
+   "cover": "https://i2.hdslb.com/bfs/archive/b38b3c3c7762747da043a74cd20367db36588226.jpg"
+  },
+  {
    "bvid": "BV1dZsu6DEQA",
    "title": "【洛克时报59.0】S5赛季竞技场PVP萌新、科研及热门阵容一图流，琉璃水母首领上线，毒队强度如何？",
-   "play": 18125,
+   "play": 18569,
    "pets": [
     "琉璃水母",
     "罗隐"
@@ -228,73 +340,43 @@
    "cover": "https://i0.hdslb.com/bfs/archive/8adedc4af6055ac4c7e24492e71aacc1de4dd597.jpg"
   },
   {
+   "bvid": "BV1jXsT67Etr",
+   "title": "四倍抗虫大胆妖起嘛！",
+   "play": 18374,
+   "pets": [
+    "加油蟹",
+    "星星眼",
+    "恶魔红钻"
+   ],
+   "seqs": 0,
+   "cover": "https://i2.hdslb.com/bfs/archive/3a57e3278bbe48b433432092f747c82f10775bb3.jpg"
+  },
+  {
    "bvid": "BV1PVWX6mEwP",
    "title": "【阵容推荐】疯狂银龙地武队，三分钟一把，暴力推全队！",
-   "play": 17878,
+   "play": 17923,
    "pets": [
     "点点",
-    "贝古斯",
-    "地鼠",
-    "岚鸟"
+    "贝古斯"
    ],
    "seqs": 0,
    "cover": "https://i1.hdslb.com/bfs/archive/d19896ffe2303feebf98733c4efff792c32bcb24.jpg"
   },
   {
+   "bvid": "BV12WsA6DEkf",
+   "title": "这是啥博弈37.0",
+   "play": 15321,
+   "pets": [],
+   "seqs": 0,
+   "cover": "https://i2.hdslb.com/bfs/archive/47cb5f6e058750e67660d1d91ffaa73048bfacb6.jpg"
+  },
+  {
    "bvid": "BV19fsT6GEgY",
    "title": "全网首发！暴力雪雨队！雪天+疯狂水世界的化学反应？超快节奏的速攻上分阵容！",
-   "play": 13651,
+   "play": 13999,
    "pets": [],
    "seqs": 0,
    "cover": "https://i0.hdslb.com/bfs/archive/05c22e2e3b5e5dd145829025d964fbee81aef2e4.jpg"
-  },
-  {
-   "bvid": "BV1iKsA6AEFo",
-   "title": "槐与阴遭遇S5最新滴溜豚阵容 终极抽卡最强读博 FX战士久留美来了！",
-   "play": 11647,
-   "pets": [
-    "滴溜豚",
-    "水灵"
-   ],
-   "seqs": 0,
-   "cover": "https://i0.hdslb.com/bfs/archive/baee677fbdc73b647573f79ddb1da93f41a8af76.jpg"
-  },
-  {
-   "bvid": "BV1zNWd6SEmN",
-   "title": "当我在洛克王国页游PK中拿出手游的S5常驻异色阵容！鲸鱼还是太权威了…",
-   "play": 11508,
-   "pets": [],
-   "seqs": 0,
-   "cover": "https://i0.hdslb.com/bfs/archive/273e088b286259c5a076c2181bdfad68d7966531.jpg"
-  },
-  {
-   "bvid": "BV15jsz6wEut",
-   "title": "新手友好，高手破防！一个视频看懂S5 PVP现状",
-   "play": 10617,
-   "pets": [
-    "多多",
-    "幻影荆棘",
-    "圆号鱼",
-    "巨鼓象",
-    "炮米花",
-    "冥古龙",
-    "水灵",
-    "飞飞钥",
-    "岚鸟",
-    "火神"
-   ],
-   "seqs": 1,
-   "cover": "https://i2.hdslb.com/bfs/archive/15f27d09b71e48db6afd27870482731e051fe89f.jpg"
-  },
-  {
-   "bvid": "BV17YsJ6UEar",
-   "title": "筑梦不适合投入太多资源！只在最需要的时候出现，洛克王国天梯赛",
-   "play": 10504,
-   "pets": [
-    "筑梦"
-   ],
-   "seqs": 0,
-   "cover": "https://i0.hdslb.com/bfs/archive/d1a852a30d76fb273efcac9a063ce9dc609d577a.jpg"
   }
  ]
 }

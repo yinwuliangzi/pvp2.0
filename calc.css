@@ -837,3 +837,12 @@ body.embed-mode .tabbar { display:none !important; }
 .cover-line.skip{color:#A9A196}
 .cover-line.fail{color:#C9503C}
 .teams-btn.alt{background:#EEF6E2;color:#4C7A22;border-color:#D6E9BC}
+
+/* 帧预筛 */
+.cover-item{position:relative}
+.cover-item.hot{border-color:#C9E39C;background:#F8FCF0;box-shadow:0 0 0 2px rgba(168,217,90,.28) inset}
+.cover-item.cold{opacity:.55}
+.cover-score{position:absolute;top:10px;right:10px;font-size:10px;font-weight:700;
+  background:rgba(24,22,18,.72);color:#fff;padding:1px 5px;border-radius:5px}
+.cover-item.cold .cover-score{background:rgba(24,22,18,.4)}
+.cover-t{font-size:10.5px}
