@@ -563,7 +563,88 @@
       .concat(conv.slice(-MAX_TURNS * 2 - 1, -1))
       .concat([{ role: "user", content: q }]);
 
-    // 带 onDelta 回调时走流式，否则一次性返回
+    // 先走「带工具的对话循环」；模型不需要工具时会直接回答
+    return chatWithTools(msgs, cfg, onDelta, 0);
+  }
+
+  /** 带工具调用的对话循环，最多循环 4 轮 */
+  function chatWithTools(msgs, cfg, onDelta, depth) {
+    var MAX_LOOP = 4;
+    return fetch(cfg.ep, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: "Bearer " + cfg.key },
+      body: JSON.stringify({
+        model: cfg.model,
+        messages: msgs,
+        tools: TOOLS,
+        tool_choice: "auto",
+        temperature: 0.3,
+        max_tokens: 4000
+      })
+    }).then(function (r) {
+      return r.text().then(function (t) { return { ok: r.ok, status: r.status, t: t }; });
+    }).then(function (res) {
+      if (!res.ok) {
+        var j = null; try { j = JSON.parse(res.t); } catch (e) {}
+        // 不支持工具调用的模型 → 退回普通对话
+        if (/tool|function|tools/i.test(String((j && j.error && j.error.message) || res.t))) {
+          return plainChat(msgs, cfg, onDelta);
+        }
+        var em = (j && j.error && j.error.message) || res.t.slice(0, 150);
+        throw new Error("HTTP " + res.status + "：" + em);
+      }
+      var j2 = {};
+      try { j2 = JSON.parse(res.t); } catch (e) {}
+      if (j2.error) throw new Error("接口报错：" + (j2.error.message || "未知"));
+
+      var choice = (j2.choices || [])[0] || {};
+      var msg = choice.message || {};
+      var calls = msg.tool_calls || [];
+
+      // 没有工具调用 → 直接是答案
+      if (!calls.length) {
+        var txt = String(msg.content || "").trim();
+        if (!txt) {
+          if (depth < MAX_LOOP) {
+            return chatWithTools(msgs.concat([
+              { role: "assistant", content: msg.content || "" },
+              { role: "user", content: "请直接给出完整回答。" }
+            ]), cfg, onDelta, depth + 1);
+          }
+          throw new Error("模型返回空内容");
+        }
+        if (typeof onDelta === "function") onDelta(txt, txt);
+        return txt;
+      }
+
+      // 执行所有工具调用
+      var toolMsgs = [{ role: "assistant", content: msg.content || "", tool_calls: calls }];
+      calls.forEach(function (c) {
+        var fn = (c.function || {});
+        var args = {};
+        try { args = JSON.parse(fn.arguments || "{}"); } catch (e) {}
+        var result;
+        try { result = runTool(fn.name, args); }
+        catch (e) { result = { error: e.message }; }
+        toolMsgs.push({
+          role: "tool",
+          tool_call_id: c.id,
+          content: JSON.stringify(result).slice(0, 6000)
+        });
+      });
+
+      if (depth >= MAX_LOOP) {
+        var fallbackTxt = "（已调用 " + calls.length + " 次工具，达到上限）\n\n" + JSON.stringify(runTool((calls[0].function || {}).name, {})).slice(0, 500);
+        return fallbackTxt;
+      }
+
+      // 把工具结果交回模型，让它基于真实数据回答
+      return chatWithTools(msgs.concat(toolMsgs), cfg, onDelta, depth + 1);
+    });
+  }
+
+  /** 不支持工具的模型：普通对话 */
+  function plainChat(msgs, cfg, onDelta) {
     var stream = typeof onDelta === "function";
     var body = {
       model: cfg.model,
@@ -888,6 +969,164 @@
       if (btn) btn.disabled = false;
       busy = false;
     });
+  }
+
+  /* ============ 工具调用（Function Calling） ============ */
+  // 让模型可以真的去调计算器算，而不是凭空回答
+  var TOOLS = [
+    {
+      type: "function",
+      function: {
+        name: "calc_damage",
+        description: "用计算器的完整引擎算一次真实伤害。含特性、印记、天气、属性克制、本系加成。当用户问「打多少」「几下打死」「能不能秒」时必须调用。",
+        parameters: {
+          type: "object",
+          properties: {
+            side: { type: "string", enum: ["mine", "foe"], description: "攻击方：mine=我方，foe=对方" },
+            skill: { type: "string", description: "技能名，必须是技能库里存在的" }
+          },
+          required: ["side", "skill"]
+        }
+      }
+    },
+    {
+      type: "function",
+      function: {
+        name: "get_pet",
+        description: "查一只精灵的完整数据：属性、种族值、特性全文、可学招式数。回答定位/配队问题时必须先调用。",
+        parameters: {
+          type: "object",
+          properties: { name: { type: "string", description: "精灵名，可用简称" } },
+          required: ["name"]
+        }
+      }
+    },
+    {
+      type: "function",
+      function: {
+        name: "get_skill",
+        description: "查一个技能的详情：属性、威力、耗能、分类、完整描述。",
+        parameters: {
+          type: "object",
+          properties: { name: { type: "string", description: "技能名" } },
+          required: ["name"]
+        }
+      }
+    },
+    {
+      type: "function",
+      function: {
+        name: "get_team",
+        description: "读用户当前在计算器里配的双方 6 只精灵、当前在场那只的血量能量招式。当用户说「我的阵容」「我这只」时必须调用。",
+        parameters: { type: "object", properties: {} }
+      }
+    },
+    {
+      type: "function",
+      function: {
+        name: "get_matrix",
+        description: "拿 6x6 对位回合差矩阵：每对我方精灵对每只对方精灵需要几回合、谁先手。当用户问整体阵容优劣时调用。",
+        parameters: { type: "object", properties: {} }
+      }
+    },
+    {
+      type: "function",
+      function: {
+        name: "find_teammates",
+        description: "按条件从精灵库筛队友。用于回答「配什么队友」。",
+        parameters: {
+          type: "object",
+          properties: {
+            resist: { type: "array", items: { type: "string" }, description: "需要抵抗的属性，如 [\"火\",\"冰\"]" },
+            minMd: { type: "number", description: "最低魔防" },
+            minDef: { type: "number", description: "最低物防" },
+            minSpe: { type: "number", description: "最低速度" },
+            limit: { type: "number", description: "返回几条，默认 8" }
+          }
+        }
+      }
+    },
+    {
+      type: "function",
+      function: {
+        name: "browse_skills",
+        description: "按属性筛技能，用于配招。",
+        parameters: {
+          type: "object",
+          properties: {
+            element: { type: "string", description: "属性，如 草" },
+            minPower: { type: "number", description: "最低威力" },
+            excludeStatus: { type: "boolean", description: "排除状态技，默认 true" },
+            limit: { type: "number", description: "返回几条，默认 10" }
+          },
+          required: ["element"]
+        }
+      }
+    }
+  ];
+
+  /** 执行模型发来的工具调用 */
+  function runTool(name, args) {
+    var b = bridge();
+    args = args || {};
+    switch (name) {
+      case "calc_damage":
+        if (!b || !b.damage) return { error: "计算器未就绪" };
+        return b.damage(args.side || "mine", args.skill || "");
+
+      case "get_pet":
+        if (!b || !b.petInfo) return { error: "计算器未就绪" };
+        return b.petInfo(args.name || "");
+
+      case "get_skill":
+        if (!b || !b.skillInfo) return { error: "计算器未就绪" };
+        return b.skillInfo(args.name || "");
+
+      case "get_team":
+        return teamAnswer();
+
+      case "get_matrix":
+        if (!b || !b.matrix) return { error: "计算器未就绪" };
+        return b.matrix();
+
+      case "find_teammates": {
+        var list = window.__ALL_PETS || window.PETS || [];
+        var wantResist = Array.isArray(args.resist) ? args.resist : [];
+        var minMd = Number(args.minMd) || 0;
+        var minDef = Number(args.minDef) || 0;
+        var minSpe = Number(args.minSpe) || 0;
+        var lim = Number(args.limit) || 8;
+        var out = [];
+        list.forEach(function (pt) {
+          if (pt.md < minMd || pt.def < minDef || pt.spe < minSpe) return;
+          var ok = true;
+          for (var i = 0; i < wantResist.length; i++) {
+            if (typeMult(wantResist[i], pt) >= 1) { ok = false; break; }
+          }
+          if (!ok) return;
+          out.push({ n: pt.n, el: pt.el + (pt.el2 ? "/" + pt.el2 : ""), hp: pt.hp, atk: pt.atk, def: pt.def, ma: pt.ma, md: pt.md, spe: pt.spe, t: pt.t || "" });
+        });
+        out.sort(function (a, b2) { return (b2.hp + b2.md) - (a.hp + a.md); });
+        return { count: out.length, list: out.slice(0, lim) };
+      }
+
+      case "browse_skills": {
+        var pool2 = SKILLS.filter(function (s) {
+          if (s.e !== args.element) return false;
+          if (args.excludeStatus !== false && s.t === "状态") return false;
+          if (Number(args.minPower) && !(Number(s.p) >= Number(args.minPower))) return false;
+          return true;
+        });
+        pool2.sort(function (a, b3) { return (Number(b3.p) || 0) - (Number(a.p) || 0); });
+        return {
+          count: pool2.length,
+          list: pool2.slice(0, Number(args.limit) || 10).map(function (s) {
+            return { n: s.n, e: s.e, p: s.p, c: s.c, t: s.t, d: (s.d || "").slice(0, 60) };
+          })
+        };
+      }
+    }
+    return { error: "未知工具：" + name };
   }
 
   /** 回答被长度截断时，让模型接着往下写（最多续 2 次） */
