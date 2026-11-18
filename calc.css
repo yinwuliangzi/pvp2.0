@@ -886,3 +886,9 @@ body.embed-mode .tabbar { display:none !important; }
   background:rgba(30,28,22,.92);color:#fff;padding:9px 16px;border-radius:10px;font-size:13px;
   transition:opacity .4s;pointer-events:none}
 .man-toast.out{opacity:0}
+
+.cfg-cmd{display:flex;flex-direction:column;gap:2px}
+.cfg-cmd-line{line-height:1.7}
+.cfg-cmd-line b{color:#A8D95A;font-weight:700;margin-right:4px}
+.cfg-cmd-line:first-child{color:#D9E8B8}
+.cfg-cmd-line:last-child{color:#9FBF77;font-size:11px}

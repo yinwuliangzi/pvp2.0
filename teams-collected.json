@@ -1,5 +1,5 @@
 {
- "generated": "2026-11-18T14:03:31.706Z",
+ "generated": "2026-11-18T14:40:05.535Z",
  "window": {
   "days": 30,
   "begin": "2026-10-19",
@@ -15,7 +15,7 @@
   "洛克王国世界 竞技场",
   "洛克王国世界 大师"
  ],
- "videos": 3,
+ "videos": 2,
  "teams": [],
  "hotTeams": [],
  "hotPets": [
@@ -23,36 +23,22 @@
    "n": "长江豚",
    "count": 1,
    "authors": 1,
-   "play": 62751,
+   "play": 62754,
    "score": 46.3
   },
   {
    "n": "水灵",
    "count": 1,
    "authors": 1,
-   "play": 62751,
+   "play": 62754,
    "score": 46.3
-  },
-  {
-   "n": "贝古斯",
-   "count": 1,
-   "authors": 1,
-   "play": 48136,
-   "score": 45.4
-  },
-  {
-   "n": "恶魔狼",
-   "count": 1,
-   "authors": 1,
-   "play": 48136,
-   "score": 45.4
   }
  ],
  "evidence": [
   {
    "bvid": "BV1KWH566EMt",
    "title": "再吐口水我报警了！江豚黑猫队！",
-   "play": 62751,
+   "play": 62754,
    "author": "麦克达克大王",
    "date": "2026-10-25",
    "cover": "http://i0.hdslb.com/bfs/archive/249c5027cb9c3c389309fbbff6530e986361f3e0.jpg",
@@ -66,27 +52,13 @@
   {
    "bvid": "BV15j4J67EmW",
    "title": "【洛克时报56.0】S5赛季竞技场PVP萌新、科研及热门阵容一图流，圣龙乐园来了！来看赛季初冲分阵容",
-   "play": 52325,
+   "play": 52331,
    "author": "树池来了",
    "date": "2026-11-07",
    "cover": "http://i0.hdslb.com/bfs/archive/8db13cfb72dda4848cc0192b9c7ddb4373fcdd40.jpg",
    "pets": [],
    "seqs": 0,
    "tier": 0.5
-  },
-  {
-   "bvid": "BV1y2456HECV",
-   "title": "两三分钟一把超解压！我研究出了新赛季的猛攻队 洛克王国世界",
-   "play": 48136,
-   "author": "长夜未复",
-   "date": "2026-11-07",
-   "cover": "http://i0.hdslb.com/bfs/archive/96349199708e6ecf0d370c454a8cb3b8dd211828.jpg",
-   "pets": [
-    "贝古斯",
-    "恶魔狼"
-   ],
-   "seqs": 0,
-   "tier": 0
   }
  ]
 }

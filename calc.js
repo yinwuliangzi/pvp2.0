@@ -3129,6 +3129,136 @@
   }
 
 
+  /* ============ 多套我方对比 ============ */
+  /** 把当前我方 6 只存成一套「我方队伍」 */
+  function myTeamsSave(name) {
+    var s = state.mine;
+    var pets = (s.slots || []).filter(Boolean).slice(0, 6);
+    if (pets.length < 4) return { ok: false, msg: "我方至少配 4 只（现在 " + pets.length + " 只）" };
+    var moves = [];
+    pets.forEach(function (pet, i) {
+      var prof = (s.slotProfiles || {})[i] || {};
+      moves.push((prof.moves || []).filter(Boolean));
+    });
+    var list = loadTeams();
+    var sig = teamSig(pets);
+    var hit = list.filter(function (t) { return t.side === "mine" && t.sig === sig; })[0];
+    if (hit) { hit.votes = (hit.votes || 1) + 1; saveTeams(list); return { ok: true, merged: true, team: hit, votes: hit.votes }; }
+    var team = {
+      id: newTeamId(),
+      name: String(name || "").trim() || (pets.slice(0, 2).join("·") + "队"),
+      pets: pets, moves: moves, hp: [],
+      side: "mine", src: "手动", note: "我方存档",
+      sig: sig, votes: 1, at: Date.now(), sources: []
+    };
+    list.push(team);
+    saveTeams(list);
+    return { ok: true, merged: false, team: team, total: list.length };
+  }
+
+  /** 一对一对位：我方 pets vs 对手 team，跑完自动还原 */
+  function evalPair(myPets, foeTeam, opt) {
+    var o = opt || {};
+    var games = Math.max(20, Math.min(300, Number(o.games) || 100));
+    var bak = window.__miaoSnapshot ? window.__miaoSnapshot() : null;
+    try {
+      state.mine.slots = myPets.slice(0, 6);
+      while (state.mine.slots.length < 6) state.mine.slots.push("");
+      state.mine.active = 0;
+      loadSlotProfile("mine", 0);
+      teamsLoad(foeTeam.id);
+
+      var d = window.__lsDuelDataFull();
+      if (!d || !d.ok) return { error: "阵容数据不全" };
+      window.Core.setData({ my: d.my, foe: d.foe, T: d.T, T0: d.T0 || null,
+        mitM: d.mitM || null, mitF: d.mitF || null, hpM: d.hpM || null, hpF: d.hpF || null });
+
+      var W = window.MiaoBridge.weights(false);
+      var zeros = function (n) { var a = []; for (var i = 0; i < n; i++) a.push(1); return a; };
+      var st = { hm: zeros(d.my.length), hf: zeros(d.foe.length), i: 0, j: 0 };
+      var formula = window.Core.predict(st, W, {});
+      var mc = window.Core.winRate(st, games, { seed: 20261118 });
+
+      var cells = window.Core.matrixCells({});
+      var diffs = cells.map(function (row) { return row.map(function (x) { return x.diff; }); });
+      var flat = [];
+      diffs.forEach(function (row) { row.forEach(function (x) { flat.push(x); }); });
+      var avg = flat.reduce(function (a, b) { return a + b; }, 0) / (flat.length || 1);
+      var worst = { diff: 999 };
+      cells.forEach(function (row) { row.forEach(function (x) {
+        if (x.diff < worst.diff) worst = { diff: x.diff, mine: d.my[x.i].n, foe: d.foe[x.j].n };
+      }); });
+      return {
+        formulaPct: Math.round(formula * 1000) / 10,
+        mcPct: Math.round(mc * 1000) / 10,
+        avgDiff: Math.round(avg * 100) / 100,
+        worst: worst.diff === 999 ? null : worst
+      };
+    } catch (e) {
+      return { error: e.message };
+    } finally {
+      if (bak) { try { window.__miaoRestore(bak); } catch (e) {} }
+    }
+  }
+
+  /**
+   * 多套我方 vs 多套对手
+   * 返回每套我方队伍的综合成绩 + 排名
+   */
+  function compareMyTeams(myIds, foeIds, opt) {
+    var o = opt || {};
+    var all = loadTeams();
+    var mines = myIds && myIds.length
+      ? all.filter(function (t) { return myIds.indexOf(t.id) >= 0; })
+      : all.filter(function (t) { return t.side === "mine"; });
+    var foes = foeIds && foeIds.length
+      ? all.filter(function (t) { return foeIds.indexOf(t.id) >= 0; })
+      : all.filter(function (t) { return t.side !== "mine"; });
+
+    if (!mines.length) return { ok: false, msg: "我方队伍库是空的：先在计算器配好我方 6 只，点「存我方队伍」" };
+    if (!foes.length) return { ok: false, msg: "对手队伍库是空的：先存几套对手" };
+
+    var rows = mines.map(function (m) {
+      var pairs = foes.map(function (f) {
+        var r = evalPair(m.pets, f, { games: o.games || 80 });
+        return { foe: f.name, foePets: f.pets, error: r.error || null, mc: r.mcPct, diff: r.avgDiff, worst: r.worst };
+      });
+      var ok = pairs.filter(function (x) { return !x.error; });
+      var avgMc = ok.length ? ok.reduce(function (a, b) { return a + b.mc; }, 0) / ok.length : 0;
+      var avgDiff = ok.length ? ok.reduce(function (a, b) { return a + b.diff; }, 0) / ok.length : 0;
+      var win = ok.filter(function (x) { return x.mc >= 50; }).length;
+      // 稳定性：胜率标准差，越小越稳
+      var mean = avgMc;
+      var sd = ok.length ? Math.sqrt(ok.reduce(function (a, b) { return a + (b.mc - mean) * (b.mc - mean); }, 0) / ok.length) : 0;
+      var worstPair = ok.slice().sort(function (a, b) { return a.mc - b.mc; })[0] || null;
+      var score = Math.round((avgMc * 0.7 + Math.min(100, Math.max(0, (avgDiff + 2) * 25)) * 0.2 + (win / Math.max(1, ok.length)) * 100 * 0.1) * 10) / 10;
+      return {
+        id: m.id, name: m.name, pets: m.pets,
+        avgMc: Math.round(avgMc * 10) / 10,
+        avgDiff: Math.round(avgDiff * 100) / 100,
+        beat: win, total: ok.length,
+        stability: Math.round(sd * 10) / 10,
+        worst: worstPair ? (worstPair.foe + " " + worstPair.mc + "%") : null,
+        score: score,
+        pairs: pairs
+      };
+    });
+    rows.sort(function (a, b) { return b.score - a.score; });
+
+    var best = rows[0];
+    var lines = [];
+    lines.push("最佳：" + best.name + "（综合 " + best.score + " 分 · 平均胜率 " + best.avgMc + "%）");
+    if (rows.length > 1) {
+      var worstTeam = rows[rows.length - 1];
+      lines.push("最差：" + worstTeam.name + "（" + worstTeam.score + " 分 · 平均胜率 " + worstTeam.avgMc + "%）");
+      lines.push("差距：" + (Math.round((best.avgMc - worstTeam.avgMc) * 10) / 10) + " 个百分点");
+    }
+    var unstable = rows.filter(function (r) { return r.stability > 18; });
+    if (unstable.length) lines.push("波动大（看脸）：" + unstable.map(function (r) { return r.name + " σ=" + r.stability; }).join("、"));
+
+    return { ok: true, rows: rows, best: best.name, verdict: lines.join("\n"), foes: foes.map(function (f) { return f.name; }) };
+  }
+
   /* ============ 队伍有效性检验 ============ */
   var _petSet = null;
   function petSet() {
@@ -3602,7 +3732,12 @@
     function refresh() {
       var o = current();
       try { localStorage.setItem(CFG_KEY, JSON.stringify(o)); } catch (e) {}
-      mask.querySelector("#cfgCmd").textContent = cmdOf(o);
+      mask.querySelector("#cfgCmd").innerHTML =
+        '<div class="cfg-cmd-line"><b>分步</b> ' + cmdOf(o) + "</div>" +
+        '<div class="cfg-cmd-line"><b>一键</b> node tools/auto.mjs' +
+          (o.links ? ' --links "' + o.links.replace(/\s+/g, " ") + '"'
+                   : " --videos " + o.videos + (o.begin ? " --begin " + o.begin : "") + (o.end ? " --end " + o.end : "")) +
+          " --frames 12 --limit 5</div>";
       var linksOn = !!o.links;
       mask.querySelector("#cfgBegin").disabled = linksOn;
       mask.querySelector("#cfgEnd").disabled = linksOn;
@@ -3625,7 +3760,7 @@
     refresh();
 
     mask.querySelector("#cfgCopy").onclick = function () {
-      var txt = mask.querySelector("#cfgCmd").textContent;
+      var txt = mask.querySelector("#cfgCmd").innerText;
       var done = function () {
         mask.querySelector("#cfgCopy").textContent = "已复制 ✓";
         setTimeout(function () { mask.querySelector("#cfgCopy").textContent = "复制命令"; }, 1500);
@@ -3732,6 +3867,51 @@
 
   window.__openManualTeam = openManualTeam;
 
+  /* ============ 我方多套对比面板 ============ */
+  function openCompare() {
+    var old = document.getElementById("cmpMask");
+    if (old) old.remove();
+    var all = loadTeams();
+    var mines = all.filter(function (t) { return t.side === "mine"; });
+    var foes = all.filter(function (t) { return t.side !== "mine"; });
+    var mask = document.createElement("div");
+    mask.id = "cmpMask";
+    mask.className = "teams-mask";
+    mask.innerHTML = '<div class="teams-box" style="width:min(780px,100%)">' +
+      '<div class="teams-hd"><b>我方多套对比</b><span class="teams-sub">每套我方 × 每套对手，算出哪个配队最强</span>' +
+      '<button type="button" class="teams-x" id="cmpClose">×</button></div>' +
+      '<div class="teams-bar"><button type="button" class="teams-btn primary" id="cmpRun">开始对比</button>' +
+      '<span class="cmp-info" id="cmpInfo">我方 ' + mines.length + " 套 · 对手 " + foes.length + " 套</span></div>" +
+      '<div class="teams-result" id="cmpBody"><div class="teams-empty">' +
+      (mines.length ? "点上面开始" : "我方队伍库是空的：先在计算器配好我方 6 只，点「存我方队伍」") +
+      "</div></div></div>";
+    document.body.appendChild(mask);
+    mask.querySelector("#cmpClose").onclick = function () { mask.remove(); };
+    mask.onclick = function (e) { if (e.target === mask) mask.remove(); };
+
+    mask.querySelector("#cmpRun").onclick = function () {
+      var body = mask.querySelector("#cmpBody");
+      body.innerHTML = '<div class="teams-loading">正在对比 ' + mines.length + " × " + foes.length + " 组…</div>";
+      setTimeout(function () {
+        var r = compareMyTeams(null, null, { games: 80 });
+        if (!r.ok) { body.innerHTML = '<div class="teams-empty">' + r.msg + "</div>"; return; }
+        var rows = r.rows.map(function (x, i) {
+          var cls = x.score >= 70 ? "good" : x.score >= 55 ? "mid" : "bad";
+          return "<tr><td>" + (i + 1) + "</td><td>" + x.name + "</td><td class='num " + cls + "'>" + x.score +
+            "</td><td class='num'>" + x.avgMc + "%</td><td class='num'>" + x.avgDiff +
+            "</td><td class='num'>" + x.beat + "/" + x.total + "</td><td class='num'>" + x.stability +
+            "</td><td>" + (x.worst || "—") + "</td></tr>";
+        }).join("");
+        body.innerHTML = '<div class="teams-tablewrap"><table class="teams-table"><thead><tr>' +
+          "<th>#</th><th>我方队伍</th><th>综合分</th><th>平均胜率</th><th>平均对位差</th><th>胜场</th><th>波动σ</th><th>最怕</th>" +
+          "</tr></thead><tbody>" + rows + "</tbody></table></div>" +
+          '<pre class="teams-verdict">' + r.verdict + "</pre>";
+      }, 40);
+    };
+  }
+
+  window.__openCompare = openCompare;
+
   /* ============ 队伍库面板 ============ */
   function openTeamsPanel() {
     var old = document.getElementById("teamsMask");
@@ -3748,6 +3928,8 @@
       '  <div class="teams-bar">',
       '    <button type="button" class="teams-btn primary" id="teamsSave">把当前对手存成队伍</button>',
       '    <button type="button" class="teams-btn" id="teamsManual">手动录入</button>',
+      '    <button type="button" class="teams-btn alt" id="teamsSaveMine">存我方队伍</button>',
+      '    <button type="button" class="teams-btn alt" id="teamsCompare">我方对比</button>',
       '    <button type="button" class="teams-btn" id="teamsImportFile">导入采集结果</button>',
       '    <button type="button" class="teams-btn" id="teamsCover">封面识别</button>',
       '    <button type="button" class="teams-btn" id="teamsFrames">视频帧识别</button>',
@@ -3805,6 +3987,14 @@
       else alert("喵喵还没加载完，刷新一下再试");
     };
     mask.querySelector("#teamsManual").onclick = function () { openManualTeam(); };
+    mask.querySelector("#teamsSaveMine").onclick = function () {
+      var nm = prompt("给这套我方队伍起个名（方便后面比较）：", "我方 " + ((window.MiaoBridge.listTeams("mine").teams || []).length + 1));
+      if (nm === null) return;
+      var r = myTeamsSave(nm);
+      if (r.ok) { renderList(false); showToast(r.merged ? "已有同队，证据 +1" : "已存：" + r.team.name); }
+      else alert(r.msg);
+    };
+    mask.querySelector("#teamsCompare").onclick = function () { openCompare(); };
     mask.querySelector("#teamsCheck").onclick = function () { openTeamCheck(); };
     mask.querySelector("#teamsCfg").onclick = function () { openCollectConfig(); };
     mask.querySelector("#teamsFrames").onclick = function () {
@@ -4327,7 +4517,13 @@
     },
     canonName: function (n) { return canonName(n); },
     saveTeamValidated: function (name, pets, extra) { return saveTeamValidated(name, pets, extra); },
-    listTeams: function () { return { ok: true, teams: loadTeams().map(function (t) { return { id: t.id, name: t.name, pets: t.pets, src: t.src, votes: t.votes || 1, sig: t.sig || "" }; }) }; },
+    listTeams: function (side) {
+      var all = loadTeams();
+      var f = side ? all.filter(function (t) { return (t.side || "foe") === side; }) : all;
+      return { ok: true, teams: f.map(function (t) { return { id: t.id, name: t.name, pets: t.pets, src: t.src, side: t.side || "foe", votes: t.votes || 1, sig: t.sig || "" }; }) };
+    },
+    saveMyTeam: function (name) { return myTeamsSave(name); },
+    compareMyTeams: function (myIds, foeIds, opt) { return compareMyTeams(myIds, foeIds, opt); },
     loadTeam: function (id) { return teamsLoad(id); },
     deleteTeam: function (id) { return teamsDelete(id); },
     importTeams: function (arr) { return teamsImport(arr); },
