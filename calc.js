@@ -3167,6 +3167,7 @@
       '    <button type="button" class="teams-btn primary" id="teamsSave">把当前对手存成队伍</button>',
       '    <button type="button" class="teams-btn" id="teamsImportFile">导入采集结果</button>',
       '    <button type="button" class="teams-btn" id="teamsCover">封面识别</button>',
+      '    <button type="button" class="teams-btn" id="teamsFrames">视频帧识别</button>',
       '    <button type="button" class="teams-btn" id="teamsRun">批量计算选中</button>',
       '    <button type="button" class="teams-btn ghost" id="teamsAll">全选</button>',
       '  </div>',
@@ -3215,7 +3216,11 @@
     mask.querySelector("#teamsAll").onclick = function () { renderList(true); };
 
     mask.querySelector("#teamsCover").onclick = function () {
-      if (window.Miao && window.Miao.recognizeCovers) window.Miao.recognizeCovers();
+      if (window.Miao && window.Miao.recognizeCovers) window.Miao.recognizeCovers("cover");
+      else alert("喵喵还没加载完，刷新一下再试");
+    };
+    mask.querySelector("#teamsFrames").onclick = function () {
+      if (window.Miao && window.Miao.recognizeCovers) window.Miao.recognizeCovers("frame");
       else alert("喵喵还没加载完，刷新一下再试");
     };
 

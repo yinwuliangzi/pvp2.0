@@ -2416,6 +2416,22 @@
     });
   }
 
+  var FRAME_PROMPT = [
+    "这是洛克王国对战的游戏画面。请找出画面里有没有精灵名单。",
+    "常见形式：",
+    "1) 「场下精灵」面板：竖排 4-6 个精灵名，带血条和等级（如 50级）",
+    "2) 「一图流」配队图：网格排列的精灵头像+名字",
+    "3) 开场阵容预览：一排精灵头像",
+    "如果有，输出 JSON（只输出 JSON，不要解释）：",
+    '{"pets":["精灵名1","精灵名2","精灵名3","精灵名4"],"confidence":"high或low","note":"来源"}\n',
+    "",
+    "规则：",
+    "- 只认精灵名，别把招式名、玩家名、弹幕文字算进去",
+    "- 按画面从上到下顺序列出",
+    "- 画面里没有名单 → 输出 {\"pets\":[],\"confidence\":\"low\",\"note\":\"无名单\"}",
+    "- 不要编造"
+  ].join("\n");
+
   var COVER_PROMPT = [
     "这是洛克王国的视频封面/一图流。",
     "如果图里列出了精灵队伍（通常 4-8 只精灵名，可能带招式），按下面格式只输出 JSON，不要任何解释：",
@@ -2427,7 +2443,9 @@
   ].join("\n");
 
   /** 打开封面识别面板 */
-  function recognizeCovers() {
+  function recognizeCovers(source) {
+    source = source === "frame" ? "frame" : "cover";
+    var isFrame = source === "frame";
     var old = document.getElementById("coverMask");
     if (old) old.remove();
     if (!cfg || !cfg.ep || !cfg.key) {
@@ -2439,8 +2457,8 @@
     mask.className = "cover-mask";
     mask.innerHTML = [
       '<div class="cover-box">',
-      '  <div class="cover-hd"><b>B站封面识别</b>',
-      '    <span class="cover-sub">勾选封面 → 视觉模型识别阵容 → 存入队伍库</span>',
+      '  <div class="cover-hd"><b>' + (isFrame ? "视频帧识别" : "B站封面识别") + '</b>',
+      '    <span class="cover-sub">勾选' + (isFrame ? "帧" : "封面") + ' → 视觉模型识别阵容 → 存入队伍库</span>',
       '    <button type="button" class="cover-x" id="coverClose">×</button></div>',
       '  <div class="cover-bar">',
       '    <button type="button" class="teams-btn primary" id="coverRun">识别选中</button>',
@@ -2459,13 +2477,18 @@
     var grid = mask.querySelector("#coverGrid");
     var status = mask.querySelector("#coverStatus");
 
-    fetch("teams-collected.json?t=" + Date.now())
+    (isFrame ? fetch("frames-index.json?t=" + Date.now()) : fetch("teams-collected.json?t=" + Date.now()))
       .then(function (r) { return r.ok ? r.json() : null; })
       .then(function (j) {
-        var ev = (j && j.evidence) || [];
-        items = ev.filter(function (x) { return x.cover; }).slice(0, 40);
+        var ev = isFrame ? (Array.isArray(j) ? j : []) : ((j && j.evidence) || []);
+        items = isFrame
+          ? ev.map(function (x) { return { cover: x.file, title: x.title, bvid: x.bvid, frame: x.frame }; })
+          : ev.filter(function (x) { return x.cover; }).slice(0, 40);
+        items = items.slice(0, 60);
         if (!items.length) {
-          grid.innerHTML = '<div class="teams-empty">采集结果里没有封面。先在本机跑：<br><code>node tools/bili-collect.mjs</code></div>';
+          grid.innerHTML = '<div class="teams-empty">' + (isFrame
+            ? '还没有抽帧。先在本机跑：<br><code>node tools/bili-frames.mjs --from-collected --limit 3</code>'
+            : '采集结果里没有封面。先在本机跑：<br><code>node tools/bili-collect.mjs</code>') + '</div>';
           status.textContent = "";
           return;
         }
@@ -2513,7 +2536,7 @@
         out.scrollTop = out.scrollHeight;
 
         urlToDataUrl(it.cover)
-          .then(function (du) { return visionCall(du, COVER_PROMPT); })
+          .then(function (du) { return visionCall(du, isFrame ? FRAME_PROMPT : COVER_PROMPT); })
           .then(function (txt) {
             var data = extractImageData(txt);
             var pets = (data && data.pets) || [];
@@ -2524,7 +2547,8 @@
               return;
             }
             var b = bridge();
-            var r = b && b.saveTeamWithPets ? b.saveTeamWithPets(pets.slice(0, 2).join("·") + "队", pets) : { ok: false };
+            var nm = pets.slice(0, 2).join("·") + "队" + (it.bvid ? "(" + String(it.bvid).slice(2, 8) + ")" : "");
+            var r = b && b.saveTeamWithPets ? b.saveTeamWithPets(nm, pets) : { ok: false };
             if (r && r.ok) {
               ok++;
               line.className = "cover-line done";
