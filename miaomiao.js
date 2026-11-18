@@ -1200,6 +1200,48 @@
     {
       type: "function",
       function: {
+        name: "list_foe_teams",
+        description: "列出队伍库里保存的对手队伍。用户问「我存了哪些队伍」时调用。",
+        parameters: { type: "object", properties: {} }
+      }
+    },
+    {
+      type: "function",
+      function: {
+        name: "save_foe_team",
+        description: "把计算器里当前的对手 6 只存成一套队伍，方便以后批量对比。用户说「把这套对手存起来」时调用。",
+        parameters: {
+          type: "object",
+          properties: { name: { type: "string", description: "队伍名称" } },
+          required: ["name"]
+        }
+      }
+    },
+    {
+      type: "function",
+      function: {
+        name: "batch_test_teams",
+        description: "一次批量计算多套对手队伍：每套跑公式胜率 + 蒙特卡洛模拟 + 6x6 对位，最后给综合结论（哪套最难打、我方谁拖后腿、配队是否合理）。用户说「测多套队伍」「哪些队伍打不过」时必须调用。",
+        parameters: {
+          type: "object",
+          properties: {
+            names: { type: "array", items: { type: "string" }, description: "要测的队伍名，留空=测全部" },
+            games: { type: "number", description: "每套跑几局模拟，默认 200" }
+          }
+        }
+      }
+    },
+    {
+      type: "function",
+      function: {
+        name: "import_collected",
+        description: "从 B站采集结果（teams-collected.json）导入热门队伍到队伍库。用户说「导入采集到的队伍」时调用。",
+        parameters: { type: "object", properties: {} }
+      }
+    },
+    {
+      type: "function",
+      function: {
         name: "get_route",
         description: "对局路径：从首发开始逐回合推演整场，返回每一步谁打谁、血量变化、胜负走向。用户问「这套阵容怎么打」「从谁首发」时调用。",
         parameters: {
@@ -1385,6 +1427,10 @@
     undo_turn: "撤销回合",
     get_battle_log: "读战报",
     simulate_battle: "模拟对战",
+    list_foe_teams: "列队伍",
+    save_foe_team: "存队伍",
+    batch_test_teams: "批量测队",
+    import_collected: "导入采集",
     get_route: "推演路径",
     get_winrate: "估胜率",
     get_best_leads: "算最优首发",
@@ -1592,6 +1638,40 @@
       case "simulate_battle":
         if (!b || !b.simulate) return { error: "计算器未就绪" };
         return b.simulate(Number(args.games) || 60);
+
+      case "list_foe_teams": {
+        if (!b || !b.listTeams) return { error: "计算器未就绪" };
+        var r0 = b.listTeams();
+        return { ok: true, count: (r0.teams || []).length, teams: (r0.teams || []).map(function (t) { return { name: t.name, pets: t.pets }; }) };
+      }
+
+      case "save_foe_team":
+        if (!b || !b.saveTeam) return { error: "计算器未就绪" };
+        return b.saveTeam(args.name || "队伍");
+
+      case "batch_test_teams": {
+        if (!b || !b.batchTest) return { error: "计算器未就绪" };
+        var ids = null;
+        if (Array.isArray(args.names) && args.names.length) {
+          var all = (b.listTeams().teams) || [];
+          ids = args.names.map(function (nm) {
+            var hit = all.filter(function (t) { return t.name === nm || t.name.indexOf(nm) >= 0; })[0];
+            return hit ? hit.id : null;
+          }).filter(Boolean);
+          if (!ids.length) return { error: "队伍库里没有这些名字", hint: all.map(function (t) { return t.name; }) };
+        }
+        return b.batchTest(ids, { games: Number(args.games) || 200 });
+      }
+
+      case "import_collected":
+        return fetch("teams-collected.json?t=" + Date.now())
+          .then(function (r) { return r.ok ? r.json() : null; })
+          .then(function (j) {
+            if (!j || !j.teams) return { error: "没有采集结果，先在本机跑 tools/bili-collect.mjs" };
+            var rr = b.importTeams(j.teams);
+            return { ok: true, added: rr.added, total: rr.total, hotPets: (j.hotPets || []).slice(0, 10), window: j.window };
+          })
+          .catch(function (e) { return { error: "读取失败：" + e.message }; });
 
       case "get_route":
         if (!b || !b.route) return { error: "计算器未就绪" };
@@ -2224,6 +2304,13 @@
   }
 
   /** 浮动入口按钮 */
+  function bindTeamsBtn() {
+    var b = document.getElementById("teamsBtn");
+    if (!b || b.__bound) return;
+    b.__bound = true;
+    b.onclick = function () { if (window.__openTeamsPanel) window.__openTeamsPanel(); };
+  }
+
   function ensureFab() {
     if (document.getElementById("mmFab")) return;
     var fab = document.createElement("button");
@@ -2237,6 +2324,7 @@
   }
 
   function open(opts) {
+    bindTeamsBtn();
     refreshData();
     build();
     // 恢复上次使用的模式
@@ -2310,4 +2398,7 @@
   } else {
     boot();
   }
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", bindTeamsBtn);
+  else bindTeamsBtn();
+
 })();

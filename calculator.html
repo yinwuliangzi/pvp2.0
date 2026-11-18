@@ -11,7 +11,7 @@
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" href="icons/icon-180.png">
 <title>洛克王国 · 对战计算器</title>
-<link rel="stylesheet" href="calc.css?v=8">
+<link rel="stylesheet" href="calc.css?v=10">
 <style>
 .duel-frame{
   position:fixed; inset:0; z-index:9999;
@@ -46,6 +46,7 @@ body.df-open{ overflow:hidden; }
     <button type="button" class="share-btn duel-nav-btn" data-duel="matrix">对战矩阵</button>
     <button type="button" class="share-btn duel-nav-btn" data-duel="route">对局路径</button>
     <button type="button" class="share-btn duel-nav-btn" data-duel="winrate">胜率估计</button>
+    <button type="button" class="share-btn" id="teamsBtn">队伍库</button>
     <button type="button" class="share-btn" id="relayShow">接抓包</button>
     <button type="button" class="share-btn" id="ocrOpen">截图识别</button>
     <button type="button" class="share-btn" id="miaoBtn" style="display:inline-flex;align-items:center;gap:5px">
@@ -390,8 +391,8 @@ body.df-open{ overflow:hidden; }
   <script src="tools/bwiki-skills-supplement.js"></script>
 <script src="types-data.js"></script>
 <script src="native-bridge.js"></script>
-<script src="calc.js?v=8"></script>
-<script src="miaomiao.js?v=8"></script>
+<script src="calc.js?v=10"></script>
+<script src="miaomiao.js?v=10"></script>
 
 <button type="button" id="hudToggle" class="mini-toggle mini-toggle-2" title="开小窗（可与主页面同步）">小窗</button>
 <button type="button" id="overlayBtn" class="mini-toggle mini-toggle-3" title="打开悬浮窗（对战面板）">悬浮</button>

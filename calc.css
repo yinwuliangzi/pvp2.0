@@ -771,3 +771,42 @@ body.embed-mode .tabbar { display:none !important; }
   border:1px solid #F0D3C8;background:#FFF4EF;color:#B5502F;font-size:12px;cursor:pointer}
 #miaomiao .mm-rollback:hover{background:#FDE8DF}
 #miaomiao .mm-rollback:disabled{opacity:.7;cursor:default;background:#F1F6E8;color:#5F8B2A;border-color:#DCEFC0}
+
+/* ===== 队伍库 ===== */
+.teams-mask{position:fixed;inset:0;z-index:9997;background:rgba(20,18,14,.42);
+  display:flex;align-items:center;justify-content:center;padding:16px}
+.teams-box{width:min(760px,100%);max-height:86vh;display:flex;flex-direction:column;
+  background:#FFFDF7;border-radius:16px;box-shadow:0 18px 50px rgba(0,0,0,.26);overflow:hidden}
+.teams-hd{display:flex;align-items:center;gap:9px;padding:13px 16px;border-bottom:1px solid #EFE7D6;background:#FAF7EF}
+.teams-hd b{font-size:15px}
+.teams-sub{font-size:11.5px;color:#8A8375}
+.teams-x{margin-left:auto;width:26px;height:26px;border:0;border-radius:8px;background:#F0EBDF;
+  color:#6B6455;font-size:17px;line-height:1;cursor:pointer}
+.teams-bar{display:flex;gap:8px;padding:11px 16px;flex-wrap:wrap;border-bottom:1px solid #F2ECDE}
+.teams-btn{border:1px solid #DED5C3;background:#fff;color:#4A4437;border-radius:9px;
+  padding:7px 12px;font-size:12.5px;cursor:pointer}
+.teams-btn.primary{background:#312E28;color:#fff;border-color:#312E28}
+.teams-btn.ghost{background:#F7F3E9}
+.teams-btn:hover{filter:brightness(.97)}
+.teams-list{flex:1 1 auto;overflow:auto;padding:8px 12px;min-height:90px}
+.teams-empty{padding:22px;text-align:center;color:#8A8375;font-size:12.5px;line-height:1.7}
+.teams-item{display:grid;grid-template-columns:18px 96px minmax(0,1fr) auto 22px;
+  align-items:center;gap:10px;padding:8px 10px;border-radius:9px;cursor:pointer}
+.teams-item:hover{background:#F8F5EC}
+.teams-name{font-size:12.5px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.teams-pets{flex:1 1 auto;font-size:11.5px;color:#6B6455;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.teams-src{font-size:10.5px;color:#A9A196;background:#F3EFE4;padding:1px 6px;border-radius:5px}
+.teams-del{border:0;background:none;color:#C9C0B0;font-size:15px;cursor:pointer;padding:0 4px}
+.teams-del:hover{color:#C9503C}
+.teams-result{border-top:1px solid #F2ECDE;max-height:44vh;overflow:auto}
+.teams-loading{padding:20px;text-align:center;color:#8A8375;font-size:12.5px}
+.teams-tablewrap{padding:10px 14px}
+.teams-table{width:100%;border-collapse:collapse;font-size:12px}
+.teams-table th{text-align:left;padding:6px 8px;color:#8A8375;font-weight:600;border-bottom:1px solid #EFE7D6}
+.teams-table td{padding:7px 8px;border-bottom:1px solid #F6F1E5;vertical-align:top}
+.teams-table .num{font-variant-numeric:tabular-nums;font-weight:700}
+.teams-table .num.good{color:#5F8B2A}
+.teams-table .num.mid{color:#B58A22}
+.teams-table .num.bad{color:#C9503C}
+.teams-verdict{margin:0;padding:10px 16px 16px;font-size:12px;line-height:1.8;color:#4A4437;
+  white-space:pre-wrap;font-family:inherit;background:#FBF8F0;border-top:1px solid #F2ECDE}
