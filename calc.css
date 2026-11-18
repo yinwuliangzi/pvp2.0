@@ -866,3 +866,13 @@ body.embed-mode .tabbar { display:none !important; }
   font-size:12px;font-family:inherit;resize:vertical;color:#3A352C}
 .cfg-cmd{margin:4px 0 8px;padding:10px 12px;background:#2E2A22;color:#D9E8B8;border-radius:9px;
   font-family:ui-monospace,Consolas,monospace;font-size:11.5px;line-height:1.6;word-break:break-all}
+
+.cfg-dates{display:flex;align-items:center;gap:8px;flex-wrap:wrap;flex:1 1 auto}
+.cfg-dates input[type=date]{border:1px solid #DED5C3;border-radius:8px;padding:6px 9px;
+  font-size:12.5px;font-family:inherit;color:#3A352C;background:#fff}
+.cfg-dates input[type=date]:disabled{background:#F3EFE4;color:#A9A196}
+.cfg-tilde{color:#A9A196;font-size:13px}
+.cfg-hint{font-size:11px;color:#A9A196}
+.cfg-row textarea{flex:1 1 auto;border:1px solid #DED5C3;border-radius:8px;padding:8px;
+  font-size:12px;font-family:inherit;resize:vertical;color:#3A352C;min-height:44px}
+.cfg-row textarea:focus{outline:none;border-color:#B9D77E}

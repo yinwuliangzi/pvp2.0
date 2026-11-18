@@ -1,12 +1,12 @@
 {
- "generated": "2026-11-18T13:33:39.421Z",
+ "generated": "2026-11-18T14:03:31.706Z",
  "window": {
-  "days": 45,
-  "begin": "2026-10-04T13:30:18.000Z",
-  "end": "2026-11-18T13:30:18.000Z"
+  "days": 30,
+  "begin": "2026-10-19",
+  "end": "2026-11-18"
  },
  "tier": "全部",
- "minPlay": 2000,
+ "minPlay": 3000,
  "keywords": [
   "洛克王国世界 阵容",
   "洛克王国世界 PVP",
@@ -15,422 +15,75 @@
   "洛克王国世界 竞技场",
   "洛克王国世界 大师"
  ],
- "videos": 20,
- "teams": [
-  {
-   "name": "可立鸡·喵喵队",
-   "pets": [
-    "可立鸡",
-    "喵喵",
-    "毛毛",
-    "丢丢",
-    "稻草人",
-    "伊贝儿"
-   ],
-   "src": "bili",
-   "score": 39.8,
-   "note": "1 个视频 · 1 个UP主",
-   "evidence": [
-    "请问？我的宝宝队有什么问题吗？（2026-10-12·235298）"
-   ],
-   "confidence": "low"
-  }
- ],
- "hotTeams": [
-  {
-   "sig": "丢丢|伊贝儿|可立鸡|喵喵|毛毛|稻草人",
-   "pets": [
-    "可立鸡",
-    "喵喵",
-    "毛毛",
-    "丢丢",
-    "稻草人",
-    "伊贝儿"
-   ],
-   "score": 39.8,
-   "videos": 1,
-   "authors": 1,
-   "play": 235298,
-   "tierScore": 0,
-   "evidence": [
-    "请问？我的宝宝队有什么问题吗？（2026-10-12·235298）"
-   ]
-  }
- ],
+ "videos": 3,
+ "teams": [],
+ "hotTeams": [],
  "hotPets": [
   {
-   "n": "星星眼",
-   "count": 4,
-   "authors": 2,
-   "play": 813936,
-   "score": 67.5
-  },
-  {
-   "n": "冥古龙",
-   "count": 3,
-   "authors": 2,
-   "play": 521458,
-   "score": 61.4
-  },
-  {
-   "n": "菊花梨",
-   "count": 2,
-   "authors": 1,
-   "play": 523459,
-   "score": 50.1
-  },
-  {
-   "n": "恶魔叮",
+   "n": "长江豚",
    "count": 1,
    "authors": 1,
-   "play": 481433,
-   "score": 44.9
+   "play": 62751,
+   "score": 46.3
   },
   {
-   "n": "高脚鹬",
+   "n": "水灵",
    "count": 1,
    "authors": 1,
-   "play": 388745,
-   "score": 44.3
+   "play": 62751,
+   "score": 46.3
   },
   {
-   "n": "伊贝儿",
+   "n": "贝古斯",
    "count": 1,
    "authors": 1,
-   "play": 235298,
-   "score": 43.1
+   "play": 48136,
+   "score": 45.4
   },
   {
-   "n": "可立鸡",
+   "n": "恶魔狼",
    "count": 1,
    "authors": 1,
-   "play": 235298,
-   "score": 43.1
-  },
-  {
-   "n": "稻草人",
-   "count": 1,
-   "authors": 1,
-   "play": 235298,
-   "score": 43.1
-  },
-  {
-   "n": "丢丢",
-   "count": 1,
-   "authors": 1,
-   "play": 235298,
-   "score": 43.1
-  },
-  {
-   "n": "喵喵",
-   "count": 1,
-   "authors": 1,
-   "play": 235298,
-   "score": 43.1
-  },
-  {
-   "n": "毛毛",
-   "count": 1,
-   "authors": 1,
-   "play": 235298,
-   "score": 43.1
-  },
-  {
-   "n": "爬爬",
-   "count": 1,
-   "authors": 1,
-   "play": 211585,
-   "score": 42.8
-  },
-  {
-   "n": "拉特",
-   "count": 1,
-   "authors": 1,
-   "play": 199781,
-   "score": 42.6
-  },
-  {
-   "n": "夜枭",
-   "count": 1,
-   "authors": 1,
-   "play": 140108,
-   "score": 41.7
-  },
-  {
-   "n": "奇丽花",
-   "count": 1,
-   "authors": 1,
-   "play": 137291,
-   "score": 41.7
-  },
-  {
-   "n": "草头鸭",
-   "count": 1,
-   "authors": 1,
-   "play": 137291,
-   "score": 41.7
-  },
-  {
-   "n": "泥吼牙",
-   "count": 1,
-   "authors": 1,
-   "play": 137291,
-   "score": 41.7
+   "play": 48136,
+   "score": 45.4
   }
  ],
  "evidence": [
   {
-   "bvid": "BV1SNxq6REfb",
-   "title": "《洛克王国：世界》S5赛季新技能与首领化展示",
-   "play": 481433,
-   "author": "洛克王国世界",
-   "date": "2026-10-31",
-   "cover": "https://i0.hdslb.com/bfs/archive/4fc99c720e1b7e439a0766c0854b1ce0d8d486e7.jpg",
+   "bvid": "BV1KWH566EMt",
+   "title": "再吐口水我报警了！江豚黑猫队！",
+   "play": 62751,
+   "author": "麦克达克大王",
+   "date": "2026-10-25",
+   "cover": "http://i0.hdslb.com/bfs/archive/249c5027cb9c3c389309fbbff6530e986361f3e0.jpg",
    "pets": [
-    "恶魔叮"
+    "长江豚",
+    "水灵"
    ],
    "seqs": 0,
    "tier": 0
   },
   {
-   "bvid": "BV1764V6qErp",
-   "title": "【眉笔】洛克王国匹配机制belike：",
-   "play": 388745,
-   "author": "Maybe眉笔笔笔",
+   "bvid": "BV15j4J67EmW",
+   "title": "【洛克时报56.0】S5赛季竞技场PVP萌新、科研及热门阵容一图流，圣龙乐园来了！来看赛季初冲分阵容",
+   "play": 52325,
+   "author": "树池来了",
    "date": "2026-11-07",
-   "cover": "https://i0.hdslb.com/bfs/archive/7285678589be9b250c89607433f4a6ded4c0f80a.jpg",
-   "pets": [
-    "高脚鹬"
-   ],
-   "seqs": 0,
-   "tier": 0
-  },
-  {
-   "bvid": "BV16oWE6JEQ4",
-   "title": "菊花梨兄弟用阿萨姆茉莉奶绿做冰山雪顶大蛋糕",
-   "play": 322600,
-   "author": "蜡笔派大辛",
-   "date": "2026-11-08",
-   "cover": "https://i1.hdslb.com/bfs/archive/24799ae90f17ea1827f1a90465119384a7c23c70.jpg",
-   "pets": [
-    "菊花梨",
-    "星星眼"
-   ],
-   "seqs": 0,
-   "tier": 0
-  },
-  {
-   "bvid": "BV14n4P6bEnq",
-   "title": "《洛克王国：世界》「对决羁绊」系统即将上线！",
-   "play": 244231,
-   "author": "洛克王国世界",
-   "date": "2026-11-02",
-   "cover": "https://i0.hdslb.com/bfs/archive/c5d38b7b02d97d628620f4722194ac47f4ccd259.jpg",
+   "cover": "http://i0.hdslb.com/bfs/archive/8db13cfb72dda4848cc0192b9c7ddb4373fcdd40.jpg",
    "pets": [],
    "seqs": 0,
-   "tier": 0
+   "tier": 0.5
   },
   {
-   "bvid": "BV1C3pd6QEMg",
-   "title": "请问？我的宝宝队有什么问题吗？",
-   "play": 235298,
-   "author": "洛克幸运君",
-   "date": "2026-10-12",
-   "cover": "https://i1.hdslb.com/bfs/archive/3787513b88cbbe666213d7913e8ae11b1d174521.jpg",
+   "bvid": "BV1y2456HECV",
+   "title": "两三分钟一把超解压！我研究出了新赛季的猛攻队 洛克王国世界",
+   "play": 48136,
+   "author": "长夜未复",
+   "date": "2026-11-07",
+   "cover": "http://i0.hdslb.com/bfs/archive/96349199708e6ecf0d370c454a8cb3b8dd211828.jpg",
    "pets": [
-    "伊贝儿",
-    "可立鸡",
-    "稻草人",
-    "丢丢",
-    "喵喵",
-    "毛毛"
-   ],
-   "seqs": 1,
-   "tier": 0
-  },
-  {
-   "bvid": "BV1nDWq6TEe8",
-   "title": "今天用洛克王国阿萨姆联动的抹茶奶绿做爆浆千层大蛋挞",
-   "play": 211873,
-   "author": "蜡笔派大辛",
-   "date": "2026-11-13",
-   "cover": "https://i0.hdslb.com/bfs/archive/578c31be239698349d5a1eb714b99fb4fe25f937.jpg",
-   "pets": [],
-   "seqs": 0,
-   "tier": 0
-  },
-  {
-   "bvid": "BV1De4q6ZEjq",
-   "title": "纯粹的数值！玩冥古龙不笑的可以确诊抑郁症了！！",
-   "play": 211585,
-   "author": "miu悱",
-   "date": "2026-11-06",
-   "cover": "https://i0.hdslb.com/bfs/archive/cb796861e41fcc82fdd6b17e029855c3ce973534.jpg",
-   "pets": [
-    "冥古龙",
-    "爬爬"
-   ],
-   "seqs": 0,
-   "tier": 0
-  },
-  {
-   "bvid": "BV14r456REA4",
-   "title": "叮叮吃完极品芒果糯米饭直接穿越到热带海滩",
-   "play": 207024,
-   "author": "蜡笔派大辛",
-   "date": "2026-11-06",
-   "cover": "https://i0.hdslb.com/bfs/archive/cfd071ec5d83f1d8a16cceed4f42deaccb6a9abb.jpg",
-   "pets": [
-    "星星眼"
-   ],
-   "seqs": 0,
-   "tier": 0
-  },
-  {
-   "bvid": "BV1n8sH6bEAb",
-   "title": "菊花梨带回家的干巴小瓜居然变出西瓜大仙",
-   "play": 200859,
-   "author": "蜡笔派大辛",
-   "date": "2026-11-15",
-   "cover": "https://i2.hdslb.com/bfs/archive/3474e2615afa596f33255515e5efa1e27c4e953e.jpg",
-   "pets": [
-    "菊花梨"
-   ],
-   "seqs": 0,
-   "tier": 0
-  },
-  {
-   "bvid": "BV18NWo6zEmZ",
-   "title": "开到什么全吃光 一口都不能剩",
-   "play": 200463,
-   "author": "蜡笔派大辛",
-   "date": "2026-11-12",
-   "cover": "https://i2.hdslb.com/bfs/archive/2766240bd3b7f66f7fc1e0a9d2fa90a978955c0f.jpg",
-   "pets": [],
-   "seqs": 0,
-   "tier": 0
-  },
-  {
-   "bvid": "BV1RL4h61EEK",
-   "title": "拉特运气逆天开上了私人飞机",
-   "play": 199781,
-   "author": "蛋仔小贝贝吖",
-   "date": "2026-11-05",
-   "cover": "https://i1.hdslb.com/bfs/archive/cd14c78ad214ecc214fbadc1d90c15abed981e7b.jpg",
-   "pets": [
-    "拉特"
-   ],
-   "seqs": 0,
-   "tier": 0
-  },
-  {
-   "bvid": "BV18x4g6JEou",
-   "title": "当同学找我pk时......",
-   "play": 191255,
-   "author": "miu悱",
-   "date": "2026-11-03",
-   "cover": "https://i0.hdslb.com/bfs/archive/741a7571b41ac4430779fbc1ba17967c7e0e71b4.jpg",
-   "pets": [],
-   "seqs": 0,
-   "tier": 0
-  },
-  {
-   "bvid": "BV19p4v6tEoC",
-   "title": "其他首发？生在没有我的时代凡人罢了！",
-   "play": 172845,
-   "author": "miu悱",
-   "date": "2026-11-06",
-   "cover": "https://i1.hdslb.com/bfs/archive/65043e68c2e43c54a5aff30d58832c01126e80ed.jpg",
-   "pets": [
-    "冥古龙"
-   ],
-   "seqs": 0,
-   "tier": 0
-  },
-  {
-   "bvid": "BV1nTHp6pEGv",
-   "title": "赛前分析：艾迪VS罗兰 月幕下的对决【洛克王国世界】",
-   "play": 146323,
-   "author": "叫我小宾仔",
-   "date": "2026-10-05",
-   "cover": "https://i0.hdslb.com/bfs/archive/e62b7f7698cafe39ac5a2e9e36069e1340380b73.jpg",
-   "pets": [],
-   "seqs": 0,
-   "tier": 0
-  },
-  {
-   "bvid": "BV1fKpP6PEUL",
-   "title": "公主这场比赛，会写进王国pvp历史吧！",
-   "play": 144484,
-   "author": "北极小熊吹空调",
-   "date": "2026-10-06",
-   "cover": "https://i1.hdslb.com/bfs/archive/31be62a0fc226e2a9b3f1d5e3b192fa2fbeae3b5.jpg",
-   "pets": [],
-   "seqs": 0,
-   "tier": 0
-  },
-  {
-   "bvid": "BV1w6Wg6FEAB",
-   "title": "叮叮被美味熔岩战斧牛排彻底征服了",
-   "play": 144204,
-   "author": "蜡笔派大辛",
-   "date": "2026-11-10",
-   "cover": "https://i0.hdslb.com/bfs/archive/b8d59317637cf2caadb9c5370a531ac982c6ce60.jpg",
-   "pets": [
-    "星星眼"
-   ],
-   "seqs": 0,
-   "tier": 0
-  },
-  {
-   "bvid": "BV1zwxF6wEZr",
-   "title": "北大来也这么玩疯狂水世界！",
-   "play": 144057,
-   "author": "洛克幸运君",
-   "date": "2026-10-29",
-   "cover": "https://i0.hdslb.com/bfs/archive/43ac1c4210e853e18860d77aa60510c5c15f8640.jpg",
-   "pets": [],
-   "seqs": 0,
-   "tier": 0
-  },
-  {
-   "bvid": "BV16XnT6kEJQ",
-   "title": "先 发 点 名",
-   "play": 140108,
-   "author": "miu悱",
-   "date": "2026-10-18",
-   "cover": "https://i1.hdslb.com/bfs/archive/cfccbcd72892be93bbeb5417904551d083b90287.jpg",
-   "pets": [
-    "星星眼",
-    "夜枭"
-   ],
-   "seqs": 0,
-   "tier": 0
-  },
-  {
-   "bvid": "BV1v2Hx6pEHZ",
-   "title": "这场pvp分明是，老叟戏顽童",
-   "play": 137291,
-   "author": "北极小熊吹空调",
-   "date": "2026-10-05",
-   "cover": "https://i0.hdslb.com/bfs/archive/d3c48963f19a76d743d57cd13b9ed51df282c777.jpg",
-   "pets": [
-    "奇丽花",
-    "草头鸭",
-    "泥吼牙"
-   ],
-   "seqs": 0,
-   "tier": 0
-  },
-  {
-   "bvid": "BV1oFW76zEQt",
-   "title": "oi，冥古龙哥也是阴到没边！",
-   "play": 137028,
-   "author": "脆脆鲨讲洛克",
-   "date": "2026-11-08",
-   "cover": "https://i1.hdslb.com/bfs/archive/45422690f0a266acd2a026862b6e99dadbfee060.jpg",
-   "pets": [
-    "冥古龙"
+    "贝古斯",
+    "恶魔狼"
    ],
    "seqs": 0,
    "tier": 0

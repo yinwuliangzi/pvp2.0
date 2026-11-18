@@ -3499,50 +3499,73 @@
 
   /* ============ 采集设置面板（细化检索范围） ============ */
   var CFG_KEY = "luoke.collect.cfg";
+  function pad2(n) { return (n < 10 ? "0" : "") + n; }
+  function todayStr(offsetDays) {
+    var d = new Date(Date.now() + (offsetDays || 0) * 86400000);
+    return d.getFullYear() + "-" + pad2(d.getMonth() + 1) + "-" + pad2(d.getDate());
+  }
+
   function loadCollectCfg() {
+    var def = {
+      begin: todayStr(-30), end: todayStr(0),
+      keywords: [
+        "洛克王国世界 阵容", "洛克王国世界 PVP", "洛克王国世界 配队",
+        "洛克王国世界 天梯", "洛克王国世界 竞技场"
+      ],
+      links: "",
+      minPlay: 3000, videos: 30, comments: 15, tier: ""
+    };
     try {
       var o = JSON.parse(localStorage.getItem(CFG_KEY) || "{}");
       return {
-        days: o.days || 30, tier: o.tier || "", minPlay: o.minPlay == null ? 3000 : o.minPlay,
-        videos: o.videos || 30, comments: o.comments || 15,
-        keywords: Array.isArray(o.keywords) && o.keywords.length ? o.keywords : [
-          "洛克王国世界 阵容", "洛克王国世界 PVP", "洛克王国世界 配队",
-          "洛克王国世界 天梯", "洛克王国世界 竞技场", "洛克王国世界 大师"
-        ]
+        begin: o.begin || def.begin,
+        end: o.end || def.end,
+        keywords: Array.isArray(o.keywords) && o.keywords.length ? o.keywords : def.keywords,
+        links: o.links || "",
+        minPlay: o.minPlay == null ? def.minPlay : Number(o.minPlay),
+        videos: o.videos || def.videos,
+        comments: o.comments || def.comments,
+        tier: o.tier || ""
       };
-    } catch (e) { return { days: 30, tier: "", minPlay: 3000, videos: 30, comments: 15, keywords: [] }; }
+    } catch (e) { return def; }
   }
 
   function openCollectConfig() {
-    var old = document.getElementById("cfgMask");
-    if (old) old.remove();
+    var oldMask = document.getElementById("cfgMask");
+    if (oldMask) oldMask.remove();
     var cfg = loadCollectCfg();
     var mask = document.createElement("div");
     mask.id = "cfgMask";
     mask.className = "teams-mask";
-    mask.innerHTML = '<div class="teams-box" style="width:min(640px,100%)">' +
-      '<div class="teams-hd"><b>采集设置</b><span class="teams-sub">按你的需求细化检索范围</span>' +
+    mask.innerHTML = '<div class="teams-box" style="width:min(700px,100%)">' +
+      '<div class="teams-hd"><b>采集设置</b><span class="teams-sub">按需求细化检索范围</span>' +
       '<button type="button" class="teams-x" id="cfgClose">×</button></div>' +
       '<div class="cfg-body">' +
-      '  <div class="cfg-row"><label>时间范围</label><div class="cfg-opts" data-k="days">' +
-      [[7, "近 7 天"], [30, "近 30 天"], [90, "近 90 天"], [180, "近半年"]].map(function (x) {
-        return '<button type="button" class="cfg-opt' + (cfg.days === x[0] ? " on" : "") + '" data-v="' + x[0] + '">' + x[1] + "</button>";
-      }).join("") + "</div></div>" +
-      '  <div class="cfg-row"><label>段位</label><div class="cfg-opts" data-k="tier">' +
-      [["", "全部"], ["大师", "大师"], ["王者", "王者/巅峰"], ["高分段", "高分段"], ["竞技场", "竞技场"]].map(function (x) {
-        return '<button type="button" class="cfg-opt' + (cfg.tier === x[0] ? " on" : "") + '" data-v="' + x[0] + '">' + x[1] + "</button>";
-      }).join("") + "</div></div>" +
+
+      '  <div class="cfg-row"><label>时间段</label><div class="cfg-dates">' +
+      '<input type="date" id="cfgBegin" value="' + cfg.begin + '">' +
+      '<span class="cfg-tilde">~</span>' +
+      '<input type="date" id="cfgEnd" value="' + cfg.end + '">' +
+      '<span class="cfg-hint">留空则不限</span></div></div>' +
+
+      '  <div class="cfg-row"><label>关键词</label>' +
+      '    <textarea id="cfgKw" rows="5" placeholder="每行一个，用于搜索视频">' + cfg.keywords.join("\n") + "</textarea></div>" +
+
+      '  <div class="cfg-row"><label>视频链接</label>' +
+      '    <textarea id="cfgLinks" rows="4" placeholder="可选：每行一个 BV 号或完整链接，填了就直采这些视频，不再搜索">' + (cfg.links || "") + "</textarea></div>" +
+
       '  <div class="cfg-row"><label>最低播放</label><div class="cfg-opts" data-k="minPlay">' +
       [[0, "不限"], [1000, "1000+"], [3000, "3000+"], [10000, "1万+"]].map(function (x) {
-        return '<button type="button" class="cfg-opt' + (cfg.minPlay === x[0] ? " on" : "") + '" data-v="' + x[0] + '">' + x[1] + "</button>";
+        return '<button type="button" class="cfg-opt' + (Number(cfg.minPlay) === x[0] ? " on" : "") + '" data-v="' + x[0] + '">' + x[1] + "</button>";
       }).join("") + "</div></div>" +
+
       '  <div class="cfg-row"><label>视频数量</label><div class="cfg-opts" data-k="videos">' +
       [[10, "10 个"], [30, "30 个"], [60, "60 个"], [100, "100 个"]].map(function (x) {
-        return '<button type="button" class="cfg-opt' + (cfg.videos === x[0] ? " on" : "") + '" data-v="' + x[0] + '">' + x[1] + "</button>";
+        return '<button type="button" class="cfg-opt' + (Number(cfg.videos) === x[0] ? " on" : "") + '" data-v="' + x[0] + '">' + x[1] + "</button>";
       }).join("") + "</div></div>" +
-      '  <div class="cfg-row"><label>关键词</label><textarea id="cfgKw" rows="3">' + cfg.keywords.join("\n") + "</textarea></div>" +
+
       '  <div class="cfg-cmd" id="cfgCmd"></div>' +
-      '  <div class="teams-bar" style="border:0"><button type="button" class="teams-btn primary" id="cfgCopy">复制命令</button>' +
+      '  <div class="teams-bar" style="border:0;padding:0"><button type="button" class="teams-btn primary" id="cfgCopy">复制命令</button>' +
       '  <button type="button" class="teams-btn" id="cfgSave">下载配置 JSON</button>' +
       '  <button type="button" class="teams-btn ghost" id="cfgReset">恢复默认</button></div>' +
       "</div></div>";
@@ -3552,47 +3575,71 @@
 
     function current() {
       var kw = String(mask.querySelector("#cfgKw").value || "").split("\n").map(function (s) { return s.trim(); }).filter(Boolean);
+      var links = String(mask.querySelector("#cfgLinks").value || "").trim();
       return {
-        days: Number(mask.querySelector('[data-k="days"] .cfg-opt.on').getAttribute("data-v")),
-        tier: mask.querySelector('[data-k="tier"] .cfg-opt.on').getAttribute("data-v"),
+        begin: mask.querySelector("#cfgBegin").value || "",
+        end: mask.querySelector("#cfgEnd").value || "",
+        keywords: kw,
+        links: links,
         minPlay: Number(mask.querySelector('[data-k="minPlay"] .cfg-opt.on').getAttribute("data-v")),
         videos: Number(mask.querySelector('[data-k="videos"] .cfg-opt.on').getAttribute("data-v")),
         comments: cfg.comments,
-        keywords: kw
+        tier: ""
       };
     }
     function cmdOf(o) {
-      return "node tools/bili-collect.mjs --days " + o.days +
-        (o.tier ? " --tier " + o.tier : "") +
-        " --minPlay " + o.minPlay + " --videos " + o.videos;
+      var parts = ["node tools/bili-collect.mjs"];
+      if (o.links) {
+        parts.push('--links "' + o.links.replace(/\s+/g, " ") + '"');
+      } else {
+        if (o.begin) parts.push("--begin " + o.begin);
+        if (o.end) parts.push("--end " + o.end);
+        parts.push("--minPlay " + o.minPlay);
+        parts.push("--videos " + o.videos);
+      }
+      return parts.join(" ");
     }
     function refresh() {
       var o = current();
       try { localStorage.setItem(CFG_KEY, JSON.stringify(o)); } catch (e) {}
       mask.querySelector("#cfgCmd").textContent = cmdOf(o);
+      var linksOn = !!o.links;
+      mask.querySelector("#cfgBegin").disabled = linksOn;
+      mask.querySelector("#cfgEnd").disabled = linksOn;
+      mask.querySelector("#cfgKw").style.opacity = linksOn ? ".45" : "1";
     }
     Array.prototype.forEach.call(mask.querySelectorAll(".cfg-opts"), function (grp) {
       grp.onclick = function (e) {
-        var b = e.target.closest(".cfg-opt");
-        if (!b) return;
+        var btn = e.target.closest(".cfg-opt");
+        if (!btn) return;
         Array.prototype.forEach.call(grp.querySelectorAll(".cfg-opt"), function (x) { x.classList.remove("on"); });
-        b.classList.add("on");
+        btn.classList.add("on");
         refresh();
       };
     });
-    mask.querySelector("#cfgKw").oninput = refresh;
+    ["#cfgKw", "#cfgLinks", "#cfgBegin", "#cfgEnd"].forEach(function (sel) {
+      var el = mask.querySelector(sel);
+      el.addEventListener("input", refresh);
+      el.addEventListener("change", refresh);
+    });
     refresh();
 
     mask.querySelector("#cfgCopy").onclick = function () {
       var txt = mask.querySelector("#cfgCmd").textContent;
-      if (navigator.clipboard) navigator.clipboard.writeText(txt).then(function () {
+      var done = function () {
         mask.querySelector("#cfgCopy").textContent = "已复制 ✓";
         setTimeout(function () { mask.querySelector("#cfgCopy").textContent = "复制命令"; }, 1500);
-      });
+      };
+      if (navigator.clipboard) navigator.clipboard.writeText(txt).then(done);
+      else { try { document.execCommand("copy"); } catch (e) {} done(); }
     };
     mask.querySelector("#cfgSave").onclick = function () {
       var o = current();
-      var blob = new Blob([JSON.stringify(o, null, 1)], { type: "application/json" });
+      var json = JSON.stringify({
+        begin: o.begin, end: o.end, keywords: o.keywords, links: o.links,
+        minPlay: o.minPlay, videos: o.videos, comments: o.comments
+      }, null, 1);
+      var blob = new Blob([json], { type: "application/json" });
       var a = document.createElement("a");
       a.href = URL.createObjectURL(blob);
       a.download = "collect-config.json";
