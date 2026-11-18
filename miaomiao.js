@@ -635,8 +635,9 @@
         return txt;
       }
 
-      // 执行所有工具调用
+      // 执行所有工具调用（可能含异步）
       var toolMsgs = [{ role: "assistant", content: msg.content || "", tool_calls: calls }];
+      var pendingCalls = [];
       calls.forEach(function (c) {
         var fn = (c.function || {});
         var args = {};
@@ -644,23 +645,25 @@
         var result;
         try { result = runTool(fn.name, args); }
         catch (e) { result = { error: e.message }; }
-        if (typeof onTrace === "function") {
-          onTrace(toolTrace(fn.name, args, result));
-        }
-        toolMsgs.push({
-          role: "tool",
-          tool_call_id: c.id,
-          content: JSON.stringify(result).slice(0, 6000)
-        });
+        pendingCalls.push(
+          Promise.resolve(result).then(function (res) {
+            if (typeof onTrace === "function") onTrace(toolTrace(fn.name, args, res));
+            return { role: "tool", tool_call_id: c.id, content: JSON.stringify(res).slice(0, 6000) };
+          })
+        );
       });
 
       if (depth >= MAX_LOOP) {
-        var fallbackTxt = "（已调用 " + calls.length + " 次工具，达到上限）\n\n" + JSON.stringify(runTool((calls[0].function || {}).name, {})).slice(0, 500);
-        return fallbackTxt;
+        return Promise.all(pendingCalls).then(function (results) {
+          return "（已调用 " + calls.length + " 次工具，达到上限）\n\n" +
+            results.map(function (r) { return String(r.content).slice(0, 300); }).join("\n");
+        });
       }
 
-      // 把工具结果交回模型，让它基于真实数据回答
-      return chatWithTools(msgs.concat(toolMsgs), cfg, onDelta, depth + 1, onTrace);
+      // 等所有工具返回，再交回模型
+      return Promise.all(pendingCalls).then(function (results) {
+        return chatWithTools(msgs.concat(toolMsgs, results), cfg, onDelta, depth + 1, onTrace);
+      });
     });
   }
 
@@ -951,14 +954,26 @@
     if (btn) btn.disabled = true;
     busy = true;
 
-    var q = question || "这张截图里是什么？如果是对战或队伍截图，请说明双方精灵、血量、能量和技能。";
+    var q = question || [
+      "先仔细看图，按下面两段回答：",
+      "",
+      "【识别结果】用 JSON 放在代码块里：",
+      "```json",
+      '{"pets":[{"name":"精灵名","hp":数字或null,"energy":数字或null,"moves":["技能1","技能2"]}],"side":"mine或foe或unknown"}',
+      "```",
+      "",
+      "【分析】基于上面的识别结果，说明这个局面怎么样、该怎么打。",
+      "看不清的字段写 null，不要猜。"
+    ].join("\\n");
     var b64 = String(dataUrl).split(",")[1];
+    // 用视觉模型（不是当前对话模型）
+    var vModel = cfg.visionModel || "deepseek-flash";
 
     fetch(cfg.ep, {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: "Bearer " + cfg.key },
       body: JSON.stringify({
-        model: cfg.model,
+        model: vModel,
         messages: [{
           role: "user",
           content: [
@@ -982,7 +997,24 @@
       }
       var j2 = JSON.parse(res.t);
       var c2 = (((j2.choices || [])[0] || {}).message || {}).content || "";
-      pushMsg("bot", c2 || "（模型没有返回内容）");
+      var row = pushMsg("bot", c2 || "（模型没有返回内容）");
+      // 识别出结构化数据 → 给一键导入按钮
+      var data = extractImageData(c2);
+      if (data && Array.isArray(data.pets) && data.pets.length && row) {
+        var bar = document.createElement("div");
+        bar.className = "mm-importbar";
+        bar.innerHTML = '<button type="button" class="mm-import-btn" data-side="mine">导入我方</button>' +
+                        '<button type="button" class="mm-import-btn ghost" data-side="foe">导入对方</button>';
+        row.querySelector(".mm-msg").appendChild(bar);
+        Array.prototype.forEach.call(bar.querySelectorAll(".mm-import-btn"), function (btn) {
+          btn.onclick = function () {
+            var side = btn.getAttribute("data-side");
+            var r2 = importPets(data.pets, side);
+            pushMsg("bot", "✅ " + r2);
+            bar.remove();
+          };
+        });
+      }
     }).catch(function (e) {
       stop();
       pushMsg("bot", "发送失败：" + e.message);
@@ -1040,6 +1072,30 @@
         name: "get_team",
         description: "读用户当前在计算器里配的双方 6 只精灵、当前在场那只的血量能量招式。当用户说「我的阵容」「我这只」时必须调用。",
         parameters: { type: "object", properties: {} }
+      }
+    },
+    {
+      type: "function",
+      function: {
+        name: "wiki_search",
+        description: "在洛克王国 bwiki 上搜索。当本地数据里没有这只精灵/技能，或用户问的可能是新内容时调用。",
+        parameters: {
+          type: "object",
+          properties: { keyword: { type: "string", description: "搜索词，如精灵名或技能名" } },
+          required: ["keyword"]
+        }
+      }
+    },
+    {
+      type: "function",
+      function: {
+        name: "wiki_page",
+        description: "读取 bwiki 上某个页面的原始内容（wikitext）。用于查精灵的详细资料、技能表、特性机制。",
+        parameters: {
+          type: "object",
+          properties: { title: { type: "string", description: "页面标题，如「武斗酷猫」" } },
+          required: ["title"]
+        }
       }
     },
     {
@@ -1279,6 +1335,8 @@
     set_numeric: "改数值",
     set_item: "换道具",
     switch_slot: "切格子",
+    wiki_search: "查bwiki",
+    wiki_page: "读bwiki",
     set_action: "设动作",
     preview_turn: "预测回合",
     record_turn: "记录回合",
@@ -1332,6 +1390,35 @@
       case "get_matrix":
         if (!b || !b.matrix) return { error: "计算器未就绪" };
         return b.matrix();
+
+      case "wiki_search": {
+        var kw = String(args.keyword || "").trim();
+        if (!kw) return { error: "缺少搜索词" };
+        return fetch("https://wiki.biligame.com/rocom/api.php?action=query&list=search&srsearch=" +
+          encodeURIComponent(kw) + "&srlimit=5&format=json&origin=*")
+          .then(function (r) { return r.json(); })
+          .then(function (j) {
+            var list = (((j.query || {}).search) || []).map(function (x) {
+              return { title: x.title, snippet: String(x.snippet || "").replace(/<[^>]+>/g, "") };
+            });
+            return { ok: true, keyword: kw, total: ((j.query || {}).searchinfo || {}).totalhits || list.length, results: list };
+          })
+          .catch(function (e) { return { error: "搜索失败：" + e.message }; });
+      }
+
+      case "wiki_page": {
+        var title = String(args.title || "").trim();
+        if (!title) return { error: "缺少页面名" };
+        return fetch("https://wiki.biligame.com/rocom/api.php?action=parse&page=" +
+          encodeURIComponent(title) + "&prop=wikitext&format=json&origin=*")
+          .then(function (r) { return r.json(); })
+          .then(function (j) {
+            if (j.error) return { error: "页面不存在：" + (j.error.info || title) };
+            var wt = ((j.parse || {}).wikitext || {})["*"] || "";
+            return { ok: true, title: title, length: wt.length, wikitext: wt.slice(0, 4000) };
+          })
+          .catch(function (e) { return { error: "读取失败：" + e.message }; });
+      }
 
       case "set_action":
         if (!b || !b.setAction) return { error: "计算器未就绪" };
@@ -1557,6 +1644,46 @@
     } catch (e) { return ""; }
   }
 
+  /** 从回答里抠出结构化识别结果 */
+  function extractImageData(text) {
+    var s = String(text || "");
+    var fence = String.fromCharCode(96, 96, 96);
+    var re = new RegExp(fence + "json([\\s\\S]*?)" + fence);
+    var m = re.exec(s);
+    var raw = m ? m[1] : null;
+    if (!raw) {
+      var m2 = /\{[\s\S]*?"pets"[\s\S]*?\}/.exec(s);
+      raw = m2 ? m2[0] : null;
+    }
+    if (!raw) return null;
+    try { return JSON.parse(raw); } catch (e) { return null; }
+  }
+
+  /** 把识别到的精灵导入计算器 */
+  function importPets(list, side) {
+    var b = bridge();
+    if (!b || !b.setPet) return "计算器未就绪";
+    var sd = side === "foe" ? "foe" : "mine";
+    var ok = 0, miss = [];
+    (list || []).slice(0, 6).forEach(function (p, i) {
+      var nm = p && p.name ? String(p.name).trim() : "";
+      if (!nm) return;
+      var r = b.setPet(sd, i, nm);
+      if (r && r.ok) {
+        ok++;
+        if (p.moves && b.setMoves) {
+          try { b.switchSlot(sd, i); b.setMoves(sd, p.moves.filter(Boolean)); } catch (e) {}
+        }
+        if (typeof p.hp === "number" && b.setNumeric) {
+          try { b.setNumeric(sd, "hp", p.hp); } catch (e) {}
+        }
+      } else {
+        miss.push(nm);
+      }
+    });
+    return "导入 " + ok + " 只" + (miss.length ? "（未找到：" + miss.join("、") + "）" : "");
+  }
+
   /** 从问题里找相关精灵，给模型补充数据 */
   function relevantContext(q) {
     try {
@@ -1611,6 +1738,7 @@
           '<input id="mmEp" placeholder="接口地址 https://api.deepseek.com/chat/completions">' +
           '<input id="mmModel" placeholder="模型 deepseek-flash">' +
           '<input id="mmKey" type="password" placeholder="API Key">' +
+          '<input id="mmVision" placeholder="视觉模型（看图用）deepseek-flash">' +
           '<div class="mm-apibtn">' +
             '<button type="button" class="mm-mini-btn" id="mmTest">测试</button>' +
             '<button type="button" class="mm-mini-btn pri" id="mmSave">保存</button>' +
@@ -1691,6 +1819,7 @@
       if (c.ep) box.querySelector("#mmEp").value = c.ep;
       if (c.model) box.querySelector("#mmModel").value = c.model;
       if (c.key) box.querySelector("#mmKey").value = c.key;
+      if (c.visionModel) box.querySelector("#mmVision").value = c.visionModel;
       // 首次打开时，从截图识别的配置里带过来
       if (!c.ep) {
         try {
@@ -1701,7 +1830,8 @@
         } catch (e) {}
       }
       if (!box.querySelector("#mmEp").value) box.querySelector("#mmEp").value = "https://api.deepseek.com/chat/completions";
-      if (!box.querySelector("#mmModel").value) box.querySelector("#mmModel").value = "deepseek-flash";
+      if (!box.querySelector("#mmModel").value) box.querySelector("#mmModel").value = "deepseek-chat";
+      if (!box.querySelector("#mmVision").value) box.querySelector("#mmVision").value = "deepseek-flash";
     }
 
     Array.prototype.forEach.call(box.querySelectorAll(".mm-seg-b"), function (b) {
@@ -1730,7 +1860,8 @@
       var key = (box.querySelector("#mmKey").value || "").trim().replace(/^Bearer\s+/i, "");
       if (/^https?:\/\/[^/]+\/?$/.test(ep)) ep = ep.replace(/\/$/, "") + "/chat/completions";
       if (!ep || !model || !key) return msg3("三项都要填", true);
-      cfg = { ep: ep, model: model, key: key };
+      var vmodel = (box.querySelector("#mmVision").value || "").trim() || "deepseek-flash";
+      cfg = { ep: ep, model: model, key: key, visionModel: vmodel };
       storeCfg(cfg);
       setMode("online", cfg);
       refreshSettings();
@@ -1957,7 +2088,7 @@
       try {
         var saved = JSON.parse(localStorage.getItem("luoke.miao.cfg") || "{}");
         if (saved.mode === "online" && saved.ep && saved.key) {
-          setMode("online", { ep: saved.ep, model: saved.model, key: saved.key });
+          setMode("online", { ep: saved.ep, model: saved.model, key: saved.key, visionModel: saved.visionModel });
         } else {
           setMode("offline");
         }
@@ -1983,7 +2114,7 @@
     try {
       var saved = JSON.parse(localStorage.getItem("luoke.miao.cfg") || "{}");
       saved.mode = mode;
-      if (c) { saved.ep = c.ep; saved.model = c.model; saved.key = c.key; }
+      if (c) { saved.ep = c.ep; saved.model = c.model; saved.key = c.key; saved.visionModel = c.visionModel; }
       localStorage.setItem("luoke.miao.cfg", JSON.stringify(saved));
     } catch (e) {}
     var el = document.getElementById("mmMode");

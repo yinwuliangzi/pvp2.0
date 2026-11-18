@@ -758,3 +758,10 @@ body.embed-mode .tabbar { display:none !important; }
 
 #miaomiao #mmSend.stop{background:linear-gradient(150deg,#FF8A6B,#E8563F);
   box-shadow:0 3px 8px rgba(232,86,63,.4);font-size:13px}
+
+#miaomiao .mm-importbar{display:flex;gap:6px;margin-top:9px;padding-top:8px;
+  border-top:1px dashed #E4DCC8}
+#miaomiao .mm-import-btn{flex:1;border:0;border-radius:8px;padding:6px 0;font-size:11.5px;
+  font-weight:700;cursor:pointer;font-family:inherit;background:#7CBF2E;color:#fff;transition:.15s}
+#miaomiao .mm-import-btn.ghost{background:#F1F6E8;color:#5F8B2A;border:1px solid #DCEFC0}
+#miaomiao .mm-import-btn:hover{filter:brightness(.96)}
