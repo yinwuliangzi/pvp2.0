@@ -3021,6 +3021,108 @@
       } catch (e) { return { ok: false, msg: e.message }; }
     },
 
+    /** 对局路径：从首发推演到收尾 */
+    route: function (leadMine, leadFoe) {
+      try {
+        if (!window.Core || !window.Core.path) return { ok: false, msg: "core.js 未加载" };
+        var d = window.__lsDuelDataFull();
+        if (!d || !d.ok) return { ok: false, msg: "阵容数据不足" };
+        var p = window.Core.path(Number(leadMine) || 0, Number(leadFoe) || 0, {});
+        var steps = (p.steps || []).slice(0, 12).map(function (s, k) {
+          return {
+            n: k + 1,
+            mine: d.my[s.i] ? d.my[s.i].n : "?",
+            foe: d.foe[s.j] ? d.foe[s.j].n : "?",
+            myHp: Math.round((s.bm || 0) * 100),
+            foeHp: Math.round((s.bf || 0) * 100),
+            after: { myHp: Math.round((s.am || 0) * 100), foeHp: Math.round((s.af || 0) * 100) },
+            win: s.win, fast: s.fast, rounds: s.rounds
+          };
+        });
+        return {
+          ok: true,
+          result: p.win || p.result || "",
+          leftMine: (p.hm || []).filter(function (x) { return x > 0.01; }).length,
+          leftFoe: (p.hf || []).filter(function (x) { return x > 0.01; }).length,
+          totalRounds: (p.steps || []).length,
+          steps: steps
+        };
+      } catch (e) { return { ok: false, msg: e.message }; }
+    },
+
+    /** 取权重：优先缓存 → 否则用一组经验值（避免每次训练卡住） */
+    weights: function (train) {
+      if (window.__miaoWeights) return window.__miaoWeights;
+      try {
+        var raw = localStorage.getItem("luoke.miao.w");
+        if (raw) {
+          var arr = JSON.parse(raw);
+          if (Array.isArray(arr) && arr.length === 8) {
+            window.__miaoWeights = arr;
+            return arr;
+          }
+        }
+      } catch (e) {}
+      // 经验权重：存活、血差、覆盖、速线、回合差、速度差、推演
+      var DEFAULT_W = [-0.15, 2.4, 2.1, 1.9, 1.6, 0.9, 0.7, 0.6];
+      if (train !== false) {
+        // 后台训练一次，成功后缓存（不阻塞当前回答）
+        try {
+          setTimeout(function () {
+            try {
+              var r = window.Core.train({ samples: 200, games: 40, seed: 20261118 });
+              if (r && r.w && r.w.length === 8) {
+                window.__miaoWeights = r.w;
+                try { localStorage.setItem("luoke.miao.w", JSON.stringify(r.w)); } catch (e) {}
+              }
+            } catch (e) {}
+          }, 60);
+        } catch (e) {}
+      }
+      return DEFAULT_W;
+    },
+
+    /** 胜率估计：用 7 维特征 + 拟合权重 */
+    winrate: function (state) {
+      try {
+        if (!window.Core || !window.Core.predict) return { ok: false, msg: "core.js 未加载" };
+        var d = window.__lsDuelDataFull();
+        if (!d || !d.ok) return { ok: false, msg: "阵容数据不足" };
+        var W = this.weights(true);
+        var st = state || { hm: d.my.map(function () { return 1; }), hf: d.foe.map(function () { return 1; }), i: 0, j: 0 };
+        var f = window.Core.feats(st, {});
+        var pv = window.Core.predict(st, W, {});
+        var names = ["存活差", "总血量差", "对位覆盖差", "速度线优势", "当前回合差", "当前速度差", "推演血量差"];
+        return {
+          ok: true,
+          win: Math.round((pv || 0) * 1000) / 10,
+          feats: (Array.isArray(f) ? f : []).map(function (v, i) {
+            return { name: names[i] || ("φ" + (i + 1)), value: Math.round(v * 100) / 100 };
+          }),
+          hasTrainedWeights: !!window.__miaoWeights,
+          note: window.__miaoWeights ? "" : "（用的是经验权重，后台会自动训练一次更准的）"
+        };
+      } catch (e) { return { ok: false, msg: e.message }; }
+    },
+
+    /** 把某只精灵的胜率按 6 个首发试一遍 */
+    winrateLeads: function () {
+      try {
+        var d = window.__lsDuelDataFull();
+        if (!d || !d.ok) return { ok: false, msg: "阵容数据不足" };
+        var out = [];
+        for (var i = 0; i < d.my.length; i++) {
+          for (var j = 0; j < d.foe.length; j++) {
+            var st = { hm: d.my.map(function () { return 1; }), hf: d.foe.map(function () { return 1; }), i: i, j: j };
+            var pv = window.Core.predict(st, window.MiaoBridge.weights(false), {});
+            out.push({ mine: d.my[i].n, foe: d.foe[j].n, win: Math.round((pv || 0) * 1000) / 10 });
+          }
+        }
+        out.sort(function (a, b) { return b.win - a.win; });
+        return { ok: true, best: out.slice(0, 5), worst: out.slice(-3).reverse() };
+      } catch (e) { return { ok: false, msg: e.message }; }
+    },
+
     /** 计算器的功能地图 */
     features: function () {
       return {

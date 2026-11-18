@@ -1045,6 +1045,50 @@
     {
       type: "function",
       function: {
+        name: "get_route",
+        description: "对局路径：从首发开始逐回合推演整场，返回每一步谁打谁、血量变化、胜负走向。用户问「这套阵容怎么打」「从谁首发」时调用。",
+        parameters: {
+          type: "object",
+          properties: {
+            leadMine: { type: "number", description: "我方首发是第几只，0-5，默认 0" },
+            leadFoe: { type: "number", description: "对方首发是第几只，0-5，默认 0" }
+          }
+        }
+      }
+    },
+    {
+      type: "function",
+      function: {
+        name: "get_winrate",
+        description: "胜率估计：把当前局面压成 7 个特征向量，用逻辑回归算胜率百分比。用户问「我这局胜率多少」「赢面大吗」时调用。",
+        parameters: { type: "object", properties: {} }
+      }
+    },
+    {
+      type: "function",
+      function: {
+        name: "get_best_leads",
+        description: "把 6×6 的最优/最差首发组合按胜率排序返回。用户问「谁首发最好」时调用。",
+        parameters: { type: "object", properties: {} }
+      }
+    },
+    {
+      type: "function",
+      function: {
+        name: "open_page",
+        description: "在浏览器里打开对应的功能页（matrix=对战矩阵 / route=对局路径 / winrate=胜率估计）。用户说「打开矩阵看看」时调用。",
+        parameters: {
+          type: "object",
+          properties: {
+            page: { type: "string", enum: ["matrix", "route", "winrate"] }
+          },
+          required: ["page"]
+        }
+      }
+    },
+    {
+      type: "function",
+      function: {
         name: "get_matrix",
         description: "拿 6x6 对位回合差矩阵：每对我方精灵对每只对方精灵需要几回合、谁先手。当用户问整体阵容优劣时调用。",
         parameters: { type: "object", properties: {} }
@@ -1175,7 +1219,11 @@
     set_moves: "改配招",
     set_numeric: "改数值",
     set_item: "换道具",
-    switch_slot: "切格子"
+    switch_slot: "切格子",
+    get_route: "推演路径",
+    get_winrate: "估胜率",
+    get_best_leads: "算最优首发",
+    open_page: "打开页面"
   };
 
   /** 把工具调用摘要成一行人话，例如「查精灵 武斗酷猫」 */
@@ -1219,6 +1267,28 @@
       case "get_matrix":
         if (!b || !b.matrix) return { error: "计算器未就绪" };
         return b.matrix();
+
+      case "get_route":
+        if (!b || !b.route) return { error: "计算器未就绪" };
+        return b.route(Number(args.leadMine) || 0, Number(args.leadFoe) || 0);
+
+      case "get_winrate":
+        if (!b || !b.winrate) return { error: "计算器未就绪" };
+        return b.winrate();
+
+      case "get_best_leads":
+        if (!b || !b.winrateLeads) return { error: "计算器未就绪" };
+        return b.winrateLeads();
+
+      case "open_page": {
+        var map = { matrix: "matrix.html", route: "route.html", winrate: "winrate.html" };
+        var f = map[args.page];
+        if (!f) return { error: "未知页面" };
+        try {
+          window.open(f, "_blank");
+          return { ok: true, msg: "已打开 " + f };
+        } catch (e) { return { error: e.message }; }
+      }
 
       case "find_teammates": {
         var list = window.__ALL_PETS || window.PETS || [];
@@ -1613,8 +1683,11 @@
       fileEl.value = "";
     };
 
-    // 发送
-    box.querySelector("#mmSend").onclick = send;
+    // 发送 / 停止
+    box.querySelector("#mmSend").onclick = function () {
+      if (busy && abortCtl) { try { abortCtl.abort(); } catch (e) {} return; }
+      send();
+    };
     inputEl.addEventListener("keydown", function (e) {
       if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); }
     });
@@ -1641,11 +1714,10 @@
     "能算伤害、查属性、配招式，也能直接帮你改阵容。";
 
   var CHIPS = [
-    "我的阵容",
-    "这个计算器怎么用",
-    "翼王怎么配招",
-    "迪莫怕什么系",
-    "圣羽翼王 vs 迪莫"
+    "分析我这套阵容",
+    "谁的胜率最高",
+    "武斗酷猫怎么配队",
+    "打开对战矩阵"
   ];
 
   function showChips() {
@@ -1668,6 +1740,20 @@
   }
 
   var busy = false;
+  var abortCtl = null;
+
+  function setBusy(on) {
+    busy = on;
+    var btn = box && box.querySelector("#mmSend");
+    if (btn) {
+      btn.disabled = false;           // 保持可点，用于中断
+      btn.classList.toggle("stop", on);
+      btn.innerHTML = on ? "■" : "➤";
+      btn.title = on ? "停止生成" : "发送";
+    }
+    if (on) { abortCtl = (typeof AbortController !== "undefined") ? new AbortController() : null; }
+    else { abortCtl = null; }
+  }
 
   function send() {
     if (busy) return;
@@ -1683,26 +1769,21 @@
     var tryOnline = mode === "online" && cfg && cfg.ep && cfg.key && cfg.model;
 
     if (!tryOnline) {
-      busy = true;
+      setBusy(true);
       var stop = showTyping();
-      var btn = box.querySelector("#mmSend");
-      if (btn) btn.disabled = true;
       setTimeout(function () {
         stop();
         var a = answerOffline(q);
         pushMsg("bot", a);
         conv.push({ role: "assistant", content: a });
         trimConv();
-        if (btn) btn.disabled = false;
-        busy = false;
-      }, 260 + Math.random() * 200);
+        setBusy(false);
+      }, 240 + Math.random() * 180);
       return;
     }
 
-    busy = true;
+    setBusy(true);
     var stop2 = showTyping();
-    var btn2 = box.querySelector("#mmSend");
-    if (btn2) btn2.disabled = true;
 
     // 工具轨迹：显示「查精灵 武斗酷猫」这类执行记录
     var traceRow = null, traceBox = null;
@@ -1762,8 +1843,7 @@
       conv.push({ role: "assistant", content: fallback });
       trimConv();
     }).then(function () {
-      if (btn2) btn2.disabled = false;
-      busy = false;
+      setBusy(false);
     });
   }
 

@@ -755,3 +755,6 @@ body.embed-mode .tabbar { display:none !important; }
 #miaomiao .mm-trace-line.bad{color:#C9503C}
 #miaomiao .mm-trace-bad{font-size:10px;background:#FBE7E2;color:#C9503C;
   padding:0 5px;border-radius:4px}
+
+#miaomiao #mmSend.stop{background:linear-gradient(150deg,#FF8A6B,#E8563F);
+  box-shadow:0 3px 8px rgba(232,86,63,.4);font-size:13px}
