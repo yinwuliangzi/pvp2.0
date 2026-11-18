@@ -2962,6 +2962,173 @@
     return { ok: true, added: added, skipped: skipped, total: list.length };
   }
 
+  /* ============ 配队合格判定（三层最小路径） ============ */
+  // 第1层：静态构成（0 次模拟）→ 第2层：对位矩阵（确定性）→ 第3层：仅边缘局跑模拟
+  var THREAT_TYPES = ["火", "水", "草", "电", "冰", "地", "翼", "毒", "虫", "光", "暗", "武", "机械", "普通", "幻", "龙"];
+
+  /** 我方 6 只对各种属性的受击倍率 */
+  function weaknessMap(pets) {
+  var m = {};
+  THREAT_TYPES.forEach(function (t) {
+    var hits = pets.filter(function (p) { return typeMult(t, p) > 1; });
+    if (hits.length) m[t] = { count: hits.length, pets: hits.map(function (p) { return p.n; }) };
+  });
+  return m;
+  }
+
+  /** 我方 6 只的属性攻击面：能克制多少种属性 */
+  function attackCoverage(pets) {
+  var covered = {};
+  pets.forEach(function (p) {
+    var chart = TYPES[p.el];
+    if (chart) (chart.strong || []).forEach(function (t) { covered[t] = true; });
+    if (p.el2) {
+      var c2 = TYPES[p.el2];
+      if (c2) (c2.strong || []).forEach(function (t) { covered[t] = true; });
+    }
+  });
+  return Object.keys(covered);
+  }
+
+  /**
+   * 评估一套队伍是否合格
+   * opt: { team:[名字], teams:[队伍库id或对象], games:200, forceSim:false }
+   */
+  function evaluateTeam(opt) {
+  var o = opt || {};
+  var names = (o.team || (state.mine.slots || [])).filter(Boolean).slice(0, 6);
+  if (names.length < 4) return { ok: false, msg: "我方至少要有 4 只才能体检（现在 " + names.length + " 只）" };
+  var pets = names.map(function (n) { return byName(n); }).filter(Boolean);
+  if (pets.length < 4) return { ok: false, msg: "有精灵不在库里：" + names.filter(function (n) { return !byName(n); }).join("、") };
+
+  var items = [];   // {name, score, max, note, level}
+  var issues = [], tips = [];
+
+  /* ---------- 第1层：静态构成 ---------- */
+  // ① 弱点堆叠（25 分）
+  var wk = weaknessMap(pets);
+  var worst = Object.keys(wk).map(function (t) { return { t: t, c: wk[t].count, pets: wk[t].pets }; })
+    .sort(function (a, b) { return b.c - a.c; })[0];
+  var stackScore = 25;
+  if (worst && worst.c >= 5) stackScore = 0;
+  else if (worst && worst.c === 4) stackScore = 8;
+  else if (worst && worst.c === 3) stackScore = 16;
+  else if (worst && worst.c === 2) stackScore = 22;
+  items.push({ name: "弱点堆叠", score: stackScore, max: 25,
+    note: worst ? (worst.c + " 只被「" + worst.t + "」克制（" + worst.pets.slice(0, 3).join("、") + "…）") : "没有共享弱点" });
+  if (worst && worst.c >= 4) issues.push("全队 " + worst.c + " 只都怕「" + worst.t + "」，遇到" + worst.t + "系会被一波带走");
+  else if (worst && worst.c === 3) tips.push("有 3 只怕「" + worst.t + "」，不算致命但要注意");
+
+  // ② 攻击覆盖（20 分）
+  var cov = attackCoverage(pets);
+  var covScore = Math.min(20, Math.round(cov.length / THREAT_TYPES.length * 20 * 1.25));
+  items.push({ name: "攻击覆盖", score: covScore, max: 20,
+    note: "能克制 " + cov.length + "/" + THREAT_TYPES.length + " 种属性" });
+  if (cov.length < 6) issues.push("攻击面太窄（只覆盖 " + cov.length + " 种属性），遇到克制不了的系会干瞪眼");
+
+  // ③ 速度结构（15 分）
+  var speeds = pets.map(function (p) { return Number(p.spe) || 0; }).sort(function (a, b) { return b - a; });
+  var fast = speeds.filter(function (s) { return s >= 110; }).length;
+  var slow = speeds.filter(function (s) { return s <= 85; }).length;
+  var spdScore = 15;
+  if (!fast) { spdScore = 3; issues.push("没有速度 ≥110 的先手位，全程被动"); }
+  else if (!slow) { spdScore = 8; tips.push("全队都是高速，缺少耐打的慢速位"); }
+  else if (fast >= 4) { spdScore = 10; tips.push("高速位偏多（" + fast + " 只），可能都脆"); }
+  items.push({ name: "速度结构", score: spdScore, max: 15,
+    note: "最快 " + speeds[0] + " · 先手位 " + fast + " 只 · 慢速位 " + slow + " 只" });
+
+  // ④ 重复度（10 分）
+  var elCount = {};
+  pets.forEach(function (p) { elCount[p.el] = (elCount[p.el] || 0) + 1; });
+  var maxSame = Math.max.apply(null, Object.keys(elCount).map(function (k) { return elCount[k]; }));
+  var dupScore = maxSame >= 4 ? 0 : (maxSame === 3 ? 4 : (maxSame === 2 ? 8 : 10));
+  items.push({ name: "属性分散", score: dupScore, max: 10,
+    note: "同属性最多 " + maxSame + " 只" });
+  if (maxSame >= 3) issues.push("同属性有 " + maxSame + " 只，弱点会重叠");
+
+  /* ---------- 第2层：对位矩阵（确定性，无随机） ---------- */
+  // 指定了别套队伍 → 临时换上再算矩阵，算完还原
+  var _bak = null;
+  if (o.team && o.team.length) {
+    try {
+      _bak = window.__miaoSnapshot ? window.__miaoSnapshot() : null;
+      state.mine.slots = o.team.slice(0, 6);
+      while (state.mine.slots.length < 6) state.mine.slots.push("");
+      state.mine.active = 0;
+      loadSlotProfile("mine", 0);
+    } catch (e) {}
+  }
+  var lib = o.teams || loadTeams();
+  var foeResults = [];
+  if (lib.length) {
+    lib.slice(0, 12).forEach(function (t) {
+      var r = evalOneTeam(t, { games: 40 });
+      if (!r || r.error) return;
+      foeResults.push(r);
+    });
+  }
+  if (_bak) { try { window.__miaoRestore(_bak); } catch (e) {} }
+  var avgDiffScore = 10, wallScore = 10;
+  if (foeResults.length) {
+    // ⑤ 对位均值（20 分）
+    var avg = foeResults.reduce(function (a, b) { return a + (b.avgDiff || 0); }, 0) / foeResults.length;
+    avgDiffScore = avg >= 1.5 ? 20 : avg >= 0.8 ? 16 : avg >= 0.3 ? 12 : avg >= 0 ? 8 : 3;
+    items.push({ name: "对位覆盖", score: avgDiffScore, max: 20,
+      note: "对 " + foeResults.length + " 套队伍平均回合差 " + (Math.round(avg * 100) / 100) });
+    if (avg < 0.3) issues.push("对主流队伍平均回合差只有 " + (Math.round(avg * 100) / 100) + "，整体偏弱");
+
+    // ⑥ 致命短板（10 分）
+    var walls = [];
+    foeResults.forEach(function (r) {
+      if (r.worst && r.worst.diff <= -2) walls.push(r.worst.mine + " vs " + r.worst.foe + "(" + r.worst.diff + ")");
+    });
+    wallScore = walls.length >= 3 ? 2 : walls.length === 2 ? 5 : walls.length === 1 ? 8 : 10;
+    items.push({ name: "致命短板", score: wallScore, max: 10,
+      note: walls.length ? walls.slice(0, 2).join(" · ") : "没有被单只对手打穿" });
+    if (walls.length >= 2) issues.push("有 " + walls.length + " 个对位被打成 −2 以内，会被针对");
+  } else {
+    items.push({ name: "对位覆盖", score: 10, max: 20, note: "队伍库为空，跳过（先存几套对手队伍）" });
+    items.push({ name: "致命短板", score: 10, max: 10, note: "队伍库为空，跳过" });
+  }
+
+  /* ---------- 汇总 + 决定是否跑模拟 ---------- */
+  var staticScore = items.reduce(function (a, b) { return a + b.score; }, 0);
+  var maxScore = items.reduce(function (a, b) { return a + b.max; }, 0);
+  var pct = Math.round(staticScore / maxScore * 100);
+
+  var needSim = o.forceSim || (pct >= 35 && pct < 75);
+  var sim = null;
+  if (needSim && foeResults.length) {
+    var wins = foeResults.map(function (r) { return r.mcPct || 0; });
+    var avgWin = wins.reduce(function (a, b) { return a + b; }, 0) / wins.length;
+    sim = { avgWin: Math.round(avgWin * 10) / 10, games: 40, teams: foeResults.length };
+    if (avgWin < 50) issues.push("对主流队伍平均模拟胜率 " + (Math.round(avgWin * 10) / 10) + "%，处于下风");
+    else if (avgWin >= 65) tips.push("对主流队伍胜率 " + (Math.round(avgWin * 10) / 10) + "%，占优");
+  }
+
+  var grade = pct >= 85 ? "S" : pct >= 75 ? "A" : pct >= 60 ? "B" : pct >= 45 ? "C" : "D";
+  var passed = pct >= 60 && !(worst && worst.c >= 5);
+
+  return {
+    ok: true,
+    team: pets.map(function (p) { return p.n; }),
+    score: pct,
+    grade: grade,
+    passed: passed,
+    items: items,
+    issues: issues,
+    tips: tips,
+    weakest: worst ? { type: worst.t, count: worst.c, pets: worst.pets } : null,
+    coverage: cov,
+    speed: { max: speeds[0], fast: fast, slow: slow },
+    sim: sim,
+    path: needSim ? "第1+2层 + 模拟（边缘区间）" : "第1+2层（跳过模拟）",
+    savedCalls: needSim ? 0 : (foeResults.length * 0),
+    verdict: passed ? ("配队合格（" + grade + " 级，" + pct + " 分）") : ("配队不合格（" + grade + " 级，" + pct + " 分）")
+  };
+  }
+
+
   /* ============ 队伍有效性检验 ============ */
   var _petSet = null;
   function petSet() {
@@ -3283,6 +3450,164 @@
     return out.join("\n");
   }
 
+  /* ============ 配队体检面板 ============ */
+  function openTeamCheck() {
+    var old = document.getElementById("checkMask");
+    if (old) old.remove();
+    var mask = document.createElement("div");
+    mask.id = "checkMask";
+    mask.className = "teams-mask";
+    mask.innerHTML = '<div class="teams-box" style="width:min(680px,100%)">' +
+      '<div class="teams-hd"><b>配队体检</b><span class="teams-sub">三层判定：静态构成 → 对位矩阵 → 仅边缘局跑模拟</span>' +
+      '<button type="button" class="teams-x" id="checkClose">×</button></div>' +
+      '<div class="teams-bar"><button type="button" class="teams-btn primary" id="checkRun">检查我方当前队伍</button>' +
+      '<button type="button" class="teams-btn" id="checkSim">强制跑模拟确认</button></div>' +
+      '<div class="teams-result" id="checkBody"><div class="teams-empty">点上面按钮开始</div></div></div>';
+    document.body.appendChild(mask);
+    mask.querySelector("#checkClose").onclick = function () { mask.remove(); };
+    mask.onclick = function (e) { if (e.target === mask) mask.remove(); };
+
+    function render(r, ms) {
+      var body = mask.querySelector("#checkBody");
+      if (!r.ok) { body.innerHTML = '<div class="teams-empty">' + r.msg + "</div>"; return; }
+      var cls = r.grade === "S" || r.grade === "A" ? "good" : (r.grade === "B" ? "mid" : "bad");
+      var rows = r.items.map(function (x) {
+        var w = Math.round(x.score / x.max * 100);
+        return "<tr><td>" + x.name + "</td><td class='num " + (w >= 75 ? "good" : w >= 45 ? "mid" : "bad") + "'>" +
+          x.score + "/" + x.max + "</td><td>" + x.note + "</td></tr>";
+      }).join("");
+      body.innerHTML =
+        '<div class="chk-head"><span class="chk-grade ' + cls + '">' + r.grade + "</span>" +
+        '<span class="chk-score">' + r.score + " 分 · " + (r.passed ? "合格" : "不合格") + "</span>" +
+        '<span class="chk-path">' + r.path + " · " + ms + "ms</span></div>" +
+        '<div class="teams-tablewrap"><table class="teams-table"><thead><tr><th>项目</th><th>得分</th><th>说明</th></tr></thead><tbody>' +
+        rows + "</tbody></table></div>" +
+        (r.issues.length ? '<pre class="teams-verdict">问题：' + "\n- " + r.issues.join("\n- ") + "</pre>" : "") +
+        (r.tips.length ? '<pre class="teams-verdict" style="background:#F3F8EA">提示：' + "\n- " + r.tips.join("\n- ") + "</pre>" : "");
+    }
+    mask.querySelector("#checkRun").onclick = function () {
+      var t0 = Date.now();
+      var r = evaluateTeam({});
+      render(r, Date.now() - t0);
+    };
+    mask.querySelector("#checkSim").onclick = function () {
+      var t0 = Date.now();
+      var r = evaluateTeam({ forceSim: true });
+      render(r, Date.now() - t0);
+    };
+  }
+
+  /* ============ 采集设置面板（细化检索范围） ============ */
+  var CFG_KEY = "luoke.collect.cfg";
+  function loadCollectCfg() {
+    try {
+      var o = JSON.parse(localStorage.getItem(CFG_KEY) || "{}");
+      return {
+        days: o.days || 30, tier: o.tier || "", minPlay: o.minPlay == null ? 3000 : o.minPlay,
+        videos: o.videos || 30, comments: o.comments || 15,
+        keywords: Array.isArray(o.keywords) && o.keywords.length ? o.keywords : [
+          "洛克王国世界 阵容", "洛克王国世界 PVP", "洛克王国世界 配队",
+          "洛克王国世界 天梯", "洛克王国世界 竞技场", "洛克王国世界 大师"
+        ]
+      };
+    } catch (e) { return { days: 30, tier: "", minPlay: 3000, videos: 30, comments: 15, keywords: [] }; }
+  }
+
+  function openCollectConfig() {
+    var old = document.getElementById("cfgMask");
+    if (old) old.remove();
+    var cfg = loadCollectCfg();
+    var mask = document.createElement("div");
+    mask.id = "cfgMask";
+    mask.className = "teams-mask";
+    mask.innerHTML = '<div class="teams-box" style="width:min(640px,100%)">' +
+      '<div class="teams-hd"><b>采集设置</b><span class="teams-sub">按你的需求细化检索范围</span>' +
+      '<button type="button" class="teams-x" id="cfgClose">×</button></div>' +
+      '<div class="cfg-body">' +
+      '  <div class="cfg-row"><label>时间范围</label><div class="cfg-opts" data-k="days">' +
+      [[7, "近 7 天"], [30, "近 30 天"], [90, "近 90 天"], [180, "近半年"]].map(function (x) {
+        return '<button type="button" class="cfg-opt' + (cfg.days === x[0] ? " on" : "") + '" data-v="' + x[0] + '">' + x[1] + "</button>";
+      }).join("") + "</div></div>" +
+      '  <div class="cfg-row"><label>段位</label><div class="cfg-opts" data-k="tier">' +
+      [["", "全部"], ["大师", "大师"], ["王者", "王者/巅峰"], ["高分段", "高分段"], ["竞技场", "竞技场"]].map(function (x) {
+        return '<button type="button" class="cfg-opt' + (cfg.tier === x[0] ? " on" : "") + '" data-v="' + x[0] + '">' + x[1] + "</button>";
+      }).join("") + "</div></div>" +
+      '  <div class="cfg-row"><label>最低播放</label><div class="cfg-opts" data-k="minPlay">' +
+      [[0, "不限"], [1000, "1000+"], [3000, "3000+"], [10000, "1万+"]].map(function (x) {
+        return '<button type="button" class="cfg-opt' + (cfg.minPlay === x[0] ? " on" : "") + '" data-v="' + x[0] + '">' + x[1] + "</button>";
+      }).join("") + "</div></div>" +
+      '  <div class="cfg-row"><label>视频数量</label><div class="cfg-opts" data-k="videos">' +
+      [[10, "10 个"], [30, "30 个"], [60, "60 个"], [100, "100 个"]].map(function (x) {
+        return '<button type="button" class="cfg-opt' + (cfg.videos === x[0] ? " on" : "") + '" data-v="' + x[0] + '">' + x[1] + "</button>";
+      }).join("") + "</div></div>" +
+      '  <div class="cfg-row"><label>关键词</label><textarea id="cfgKw" rows="3">' + cfg.keywords.join("\n") + "</textarea></div>" +
+      '  <div class="cfg-cmd" id="cfgCmd"></div>' +
+      '  <div class="teams-bar" style="border:0"><button type="button" class="teams-btn primary" id="cfgCopy">复制命令</button>' +
+      '  <button type="button" class="teams-btn" id="cfgSave">下载配置 JSON</button>' +
+      '  <button type="button" class="teams-btn ghost" id="cfgReset">恢复默认</button></div>' +
+      "</div></div>";
+    document.body.appendChild(mask);
+    mask.querySelector("#cfgClose").onclick = function () { mask.remove(); };
+    mask.onclick = function (e) { if (e.target === mask) mask.remove(); };
+
+    function current() {
+      var kw = String(mask.querySelector("#cfgKw").value || "").split("\n").map(function (s) { return s.trim(); }).filter(Boolean);
+      return {
+        days: Number(mask.querySelector('[data-k="days"] .cfg-opt.on').getAttribute("data-v")),
+        tier: mask.querySelector('[data-k="tier"] .cfg-opt.on').getAttribute("data-v"),
+        minPlay: Number(mask.querySelector('[data-k="minPlay"] .cfg-opt.on').getAttribute("data-v")),
+        videos: Number(mask.querySelector('[data-k="videos"] .cfg-opt.on').getAttribute("data-v")),
+        comments: cfg.comments,
+        keywords: kw
+      };
+    }
+    function cmdOf(o) {
+      return "node tools/bili-collect.mjs --days " + o.days +
+        (o.tier ? " --tier " + o.tier : "") +
+        " --minPlay " + o.minPlay + " --videos " + o.videos;
+    }
+    function refresh() {
+      var o = current();
+      try { localStorage.setItem(CFG_KEY, JSON.stringify(o)); } catch (e) {}
+      mask.querySelector("#cfgCmd").textContent = cmdOf(o);
+    }
+    Array.prototype.forEach.call(mask.querySelectorAll(".cfg-opts"), function (grp) {
+      grp.onclick = function (e) {
+        var b = e.target.closest(".cfg-opt");
+        if (!b) return;
+        Array.prototype.forEach.call(grp.querySelectorAll(".cfg-opt"), function (x) { x.classList.remove("on"); });
+        b.classList.add("on");
+        refresh();
+      };
+    });
+    mask.querySelector("#cfgKw").oninput = refresh;
+    refresh();
+
+    mask.querySelector("#cfgCopy").onclick = function () {
+      var txt = mask.querySelector("#cfgCmd").textContent;
+      if (navigator.clipboard) navigator.clipboard.writeText(txt).then(function () {
+        mask.querySelector("#cfgCopy").textContent = "已复制 ✓";
+        setTimeout(function () { mask.querySelector("#cfgCopy").textContent = "复制命令"; }, 1500);
+      });
+    };
+    mask.querySelector("#cfgSave").onclick = function () {
+      var o = current();
+      var blob = new Blob([JSON.stringify(o, null, 1)], { type: "application/json" });
+      var a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = "collect-config.json";
+      a.click();
+    };
+    mask.querySelector("#cfgReset").onclick = function () {
+      try { localStorage.removeItem(CFG_KEY); } catch (e) {}
+      mask.remove();
+      openCollectConfig();
+    };
+  }
+
+  window.__openTeamCheck = openTeamCheck;
+  window.__openCollectConfig = openCollectConfig;
+
   /* ============ 队伍库面板 ============ */
   function openTeamsPanel() {
     var old = document.getElementById("teamsMask");
@@ -3301,6 +3626,8 @@
       '    <button type="button" class="teams-btn" id="teamsImportFile">导入采集结果</button>',
       '    <button type="button" class="teams-btn" id="teamsCover">封面识别</button>',
       '    <button type="button" class="teams-btn" id="teamsFrames">视频帧识别</button>',
+      '    <button type="button" class="teams-btn alt" id="teamsCheck">配队体检</button>',
+      '    <button type="button" class="teams-btn ghost" id="teamsCfg">采集设置</button>',
       '    <button type="button" class="teams-btn" id="teamsRun">批量计算选中</button>',
       '    <button type="button" class="teams-btn ghost" id="teamsAll">全选</button>',
       '  </div>',
@@ -3352,6 +3679,8 @@
       if (window.Miao && window.Miao.recognizeCovers) window.Miao.recognizeCovers("cover");
       else alert("喵喵还没加载完，刷新一下再试");
     };
+    mask.querySelector("#teamsCheck").onclick = function () { openTeamCheck(); };
+    mask.querySelector("#teamsCfg").onclick = function () { openCollectConfig(); };
     mask.querySelector("#teamsFrames").onclick = function () {
       if (window.Miao && window.Miao.recognizeCovers) window.Miao.recognizeCovers("frame");
       else alert("喵喵还没加载完，刷新一下再试");
@@ -3750,7 +4079,7 @@
       } catch (e) { return { ok: false, msg: e.message }; }
     },
 
-    /** 对局路径：从首发推演到收尾 */
+  /** 对局路径：从首发推演到收尾 */
     route: function (leadMine, leadFoe) {
       try {
         if (!window.Core || !window.Core.path) return { ok: false, msg: "core.js 未加载" };
@@ -3856,6 +4185,7 @@
     saveTeam: function (name) { return teamsSave(name); },
     saveTeamWithPets: function (name, pets) { return saveTeamWithPets(name, pets, { src: "识别" }); },
     validateTeam: function (pets) { return validateTeam(pets); },
+    evaluateTeam: function (opt) { return evaluateTeam(opt); },
     canonName: function (n) { return canonName(n); },
     saveTeamValidated: function (name, pets, extra) { return saveTeamValidated(name, pets, extra); },
     listTeams: function () { return { ok: true, teams: loadTeams().map(function (t) { return { id: t.id, name: t.name, pets: t.pets, src: t.src, votes: t.votes || 1, sig: t.sig || "" }; }) }; },
