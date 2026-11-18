@@ -3021,6 +3021,136 @@
       } catch (e) { return { ok: false, msg: e.message }; }
     },
 
+    // ===== 作战模块 =====
+
+    /** 设置某方本回合动作 */
+    setAction: function (side, act, skillName) {
+      side = side === "foe" ? "foe" : "mine";
+      var allow = ["attack", "charge", "switch", "counter", "item"];
+      if (allow.indexOf(act) < 0) return { ok: false, msg: "动作只能是 " + allow.join("/") };
+      var sel = $(side === "mine" ? "meAction" : "foeActionRec");
+      if (!sel) return { ok: false, msg: "找不到动作下拉" };
+      sel.value = act;
+      sel.dispatchEvent(new Event("change", { bubbles: true }));
+      if (skillName) {
+        var m = $(side === "mine" ? "meMoveSel" : "foeMoveSel");
+        if (m) {
+          var hit = Array.prototype.filter.call(m.options, function (o) { return o.value === skillName; })[0] ||
+                    Array.prototype.filter.call(m.options, function (o) { return o.value && o.value.indexOf(skillName) >= 0; })[0];
+          if (hit) { m.value = hit.value; m.dispatchEvent(new Event("change", { bubbles: true })); }
+          else return { ok: false, msg: "这只精灵没有技能「" + skillName + "」" };
+        }
+      }
+      try { if (typeof renderActPreview === "function") renderActPreview(sideStats("mine"), sideStats("foe")); } catch (e) {}
+      return { ok: true, msg: (side === "mine" ? "我方" : "对方") + " 动作设为 " + act + (skillName ? " / " + skillName : "") };
+    },
+
+    /** 读本回合预测：谁先手、打多少、能量怎么变 */
+    battlePreview: function () {
+      try {
+        var st = window.__lsState();
+        var meAct = ($("meAction") && $("meAction").value) || "attack";
+        var foeAct = ($("foeActionRec") && $("foeActionRec").value) || "attack";
+        var meSk = ($("meMoveSel") && $("meMoveSel").value) || "";
+        var foeSk = ($("foeMoveSel") && $("foeMoveSel").value) || "";
+        var txt = window.__lsPreview ? window.__lsPreview() : "";
+        var me = sideStats("mine"), foe = sideStats("foe");
+        var dmgOut = 0, dmgIn = 0;
+        line: if (meSk) { try { dmgOut = hitDamage("mine", skillByName(meSk), me, foe, -1, false); } catch (e) {} }
+        if (foeSk) { try { dmgIn = hitDamage("foe", skillByName(foeSk), foe, me, -1, false); } catch (e) {} }
+        return {
+          ok: true,
+          actions: { mine: meAct + (meSk ? "(" + meSk + ")" : ""), foe: foeAct + (foeSk ? "(" + foeSk + ")" : "") },
+          hp: { mine: state.mine.hp, foe: state.foe.hp },
+          energy: { mine: state.mine.energy, foe: state.foe.energy },
+          speed: { mine: me.stats.spe, foe: foe.stats.spe },
+          first: me.stats.spe >= foe.stats.spe ? "mine" : "foe",
+          damage: { out: dmgOut, in: dmgIn },
+          kills: {
+            mineDies: dmgIn >= state.mine.hp,
+            foeDies: dmgOut >= state.foe.hp
+          },
+          lines: txt ? txt.split("\n").filter(Boolean).slice(0, 12) : []
+        };
+      } catch (e) { return { ok: false, msg: e.message }; }
+    },
+
+    /** 真的记录本回合 */
+    recordBattleTurn: function () {
+      try {
+        var btn = $("recordTurn");
+        if (!btn) return { ok: false, msg: "找不到记录按钮" };
+        var before = (state.history || []).length;
+        btn.click();
+        var after = (state.history || []).length;
+        if (after <= before) return { ok: false, msg: "没能记录（可能动作不合法）" };
+        var h = state.history[after - 1] || {};
+        return {
+          ok: true,
+          turn: after,
+          summary: "第 " + after + " 回合：我 " + state.mine.hp + " / 敌 " + state.foe.hp,
+          note: h.itemMe || h.itemFoe || ""
+        };
+      } catch (e) { return { ok: false, msg: e.message }; }
+    },
+
+    /** 撤销上一回合 */
+    undoBattleTurn: function () {
+      try {
+        var btn = $("undoTurn");
+        if (!btn) return { ok: false, msg: "找不到撤销按钮" };
+        var before = (state.history || []).length;
+        btn.click();
+        var after = (state.history || []).length;
+        if (after >= before) return { ok: false, msg: "没有可撤销的回合" };
+        return { ok: true, msg: "已撤销 1 回合，现在第 " + after + " 回合", hp: { mine: state.mine.hp, foe: state.foe.hp } };
+      } catch (e) { return { ok: false, msg: e.message }; }
+    },
+
+    /** 历史回合 */
+    battleHistory: function () {
+      var h = state.history || [];
+      return {
+        ok: true,
+        turns: h.length,
+        rows: h.slice(-8).map(function (x, i) {
+          return {
+            turn: h.length - Math.min(8, h.length) + i + 1,
+            mineHp: x.mineHp, foeHp: x.foeHp,
+            mineEnergy: x.mineEnergy, foeEnergy: x.foeEnergy,
+            meAct: x.meAct, foeAct: x.foeAct,
+            note: x.itemMe || ""
+          };
+        })
+      };
+    },
+
+    /** 蒙特卡洛模拟：从当前局面跑 N 局，返回真实胜率 */
+    simulate: function (games) {
+      try {
+        if (!window.Core || !window.Core.battle) return { ok: false, msg: "core.js 未加载" };
+        var d = window.__lsDuelDataFull();
+        if (!d || !d.ok) return { ok: false, msg: "阵容数据不足" };
+        var n = Math.max(10, Math.min(200, Number(games) || 60));
+        var st = {
+          hm: d.my.map(function () { return 1; }),
+          hf: d.foe.map(function () { return 1; }),
+          i: state.mine.active || 0,
+          j: state.foe.active || 0
+        };
+        var win = 0;
+        for (var k = 0; k < n; k++) {
+          if (window.Core.battle(st, { rng: window.Core.mulberry32(1000 + k) })) win++;
+        }
+        return {
+          ok: true,
+          games: n,
+          win: Math.round(win / n * 1000) / 10,
+          note: "从当前首发对位跑 " + n + " 局随机战斗"
+        };
+      } catch (e) { return { ok: false, msg: e.message }; }
+    },
+
     /** 对局路径：从首发推演到收尾 */
     route: function (leadMine, leadFoe) {
       try {

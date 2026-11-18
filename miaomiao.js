@@ -1045,6 +1045,65 @@
     {
       type: "function",
       function: {
+        name: "set_action",
+        description: "设置某一方本回合的动作。当用户说「我这回合出 X」「对面换人」时调用。",
+        parameters: {
+          type: "object",
+          properties: {
+            side: { type: "string", enum: ["mine", "foe"] },
+            act: { type: "string", enum: ["attack", "charge", "switch", "counter", "item"], description: "attack=出招 charge=聚能 switch=换人 counter=应对 item=道具" },
+            skill: { type: "string", description: "出招时用哪个技能，其它动作可省略" }
+          },
+          required: ["side", "act"]
+        }
+      }
+    },
+    {
+      type: "function",
+      function: {
+        name: "preview_turn",
+        description: "预测本回合会发生什么：谁先手、双方打多少伤害、能量变化、会不会倒。用户问「这回合会怎样」「打不打得死」时调用。",
+        parameters: { type: "object", properties: {} }
+      }
+    },
+    {
+      type: "function",
+      function: {
+        name: "record_turn",
+        description: "真的把本回合记录进战斗日志（会改变血量能量）。只有用户明确说「记录这回合」时才调用。",
+        parameters: { type: "object", properties: {} }
+      }
+    },
+    {
+      type: "function",
+      function: {
+        name: "undo_turn",
+        description: "撤销上一回合的记录。用户说「撤销」「记错了」时调用。",
+        parameters: { type: "object", properties: {} }
+      }
+    },
+    {
+      type: "function",
+      function: {
+        name: "get_battle_log",
+        description: "读最近的回合记录：每回合双方血量、能量、动作。",
+        parameters: { type: "object", properties: {} }
+      }
+    },
+    {
+      type: "function",
+      function: {
+        name: "simulate_battle",
+        description: "蒙特卡洛模拟：按当前阵容跑几十局随机战斗，返回真实胜率。比公式估算更全面。用户问「这套阵容强不强」时可调用。",
+        parameters: {
+          type: "object",
+          properties: { games: { type: "number", description: "跑几局，10-200，默认 60" } }
+        }
+      }
+    },
+    {
+      type: "function",
+      function: {
         name: "get_route",
         description: "对局路径：从首发开始逐回合推演整场，返回每一步谁打谁、血量变化、胜负走向。用户问「这套阵容怎么打」「从谁首发」时调用。",
         parameters: {
@@ -1220,6 +1279,12 @@
     set_numeric: "改数值",
     set_item: "换道具",
     switch_slot: "切格子",
+    set_action: "设动作",
+    preview_turn: "预测回合",
+    record_turn: "记录回合",
+    undo_turn: "撤销回合",
+    get_battle_log: "读战报",
+    simulate_battle: "模拟对战",
     get_route: "推演路径",
     get_winrate: "估胜率",
     get_best_leads: "算最优首发",
@@ -1267,6 +1332,30 @@
       case "get_matrix":
         if (!b || !b.matrix) return { error: "计算器未就绪" };
         return b.matrix();
+
+      case "set_action":
+        if (!b || !b.setAction) return { error: "计算器未就绪" };
+        return b.setAction(args.side || "mine", args.act || "attack", args.skill || "");
+
+      case "preview_turn":
+        if (!b || !b.battlePreview) return { error: "计算器未就绪" };
+        return b.battlePreview();
+
+      case "record_turn":
+        if (!b || !b.recordBattleTurn) return { error: "计算器未就绪" };
+        return b.recordBattleTurn();
+
+      case "undo_turn":
+        if (!b || !b.undoBattleTurn) return { error: "计算器未就绪" };
+        return b.undoBattleTurn();
+
+      case "get_battle_log":
+        if (!b || !b.battleHistory) return { error: "计算器未就绪" };
+        return b.battleHistory();
+
+      case "simulate_battle":
+        if (!b || !b.simulate) return { error: "计算器未就绪" };
+        return b.simulate(Number(args.games) || 60);
 
       case "get_route":
         if (!b || !b.route) return { error: "计算器未就绪" };
