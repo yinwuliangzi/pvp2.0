@@ -10280,4 +10280,26 @@
     });
     return bits;
   };
+  // 首屏就绪：移除加载遮罩
+  function __bootDone() {
+    var m = document.getElementById("bootMask");
+    if (!m || m.__done) return;
+    m.__done = true;
+    var f = document.getElementById("bmFill");
+    if (f) f.style.width = "100%";
+    setTimeout(function () {
+      m.classList.add("out");
+      setTimeout(function () { try { m.remove(); } catch (e) {} }, 400);
+    }, 120);
+  }
+  try {
+    if (document.readyState === "loading") {
+      document.addEventListener("DOMContentLoaded", function () { setTimeout(__bootDone, 30); });
+    } else {
+      setTimeout(__bootDone, 30);
+    }
+    // 兜底：8 秒后无论如如何都要移除，不能把用户卡住
+    setTimeout(__bootDone, 8000);
+  } catch (e) {}
+
 })();
