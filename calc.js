@@ -10280,26 +10280,35 @@
     });
     return bits;
   };
-  // 首屏就绪：移除加载遮罩
-  function __bootDone() {
-    var m = document.getElementById("bootMask");
-    if (!m || m.__done) return;
-    m.__done = true;
-    var f = document.getElementById("bmFill");
-    if (f) f.style.width = "100%";
-    setTimeout(function () {
-      m.classList.add("out");
-      setTimeout(function () { try { m.remove(); } catch (e) {} }, 400);
-    }, 120);
-  }
-  try {
-    if (document.readyState === "loading") {
-      document.addEventListener("DOMContentLoaded", function () { setTimeout(__bootDone, 30); });
-    } else {
-      setTimeout(__bootDone, 30);
+  // 首屏就绪：等真实数据渲染出来再移除遮罩
+  (function () {
+    var tries = 0;
+    var MAX = 200;          // 最多等 20 秒
+    function ready() {
+      tries++;
+      var nameEl = document.getElementById("mineNameText");
+      var txt = nameEl ? String(nameEl.textContent || "").trim() : "";
+      var ok = !!txt && txt !== "选择精灵";
+      var m = document.getElementById("bootMask");
+      if (ok || tries >= MAX) {
+        var f = document.getElementById("bmFill");
+        if (f) f.style.width = "100%";
+        if (m && !m.__done) {
+          m.__done = true;
+          setTimeout(function () {
+            m.classList.add("out");
+            setTimeout(function () { try { m.remove(); } catch (e) {} }, 400);
+          }, 100);
+        }
+        return;
+      }
+      if (m) {
+        var st = document.getElementById("bmStep");
+        if (st) st.textContent = "正在加载数据…（" + Math.min(99, Math.round(tries / MAX * 100)) + "%）";
+      }
+      setTimeout(ready, 100);
     }
-    // 兜底：8 秒后无论如如何都要移除，不能把用户卡住
-    setTimeout(__bootDone, 8000);
-  } catch (e) {}
+    setTimeout(ready, 100);
+  })();
 
 })();
