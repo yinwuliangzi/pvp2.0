@@ -765,3 +765,9 @@ body.embed-mode .tabbar { display:none !important; }
   font-weight:700;cursor:pointer;font-family:inherit;background:#7CBF2E;color:#fff;transition:.15s}
 #miaomiao .mm-import-btn.ghost{background:#F1F6E8;color:#5F8B2A;border:1px solid #DCEFC0}
 #miaomiao .mm-import-btn:hover{filter:brightness(.96)}
+
+/* ===== 执行宪法：撤销本轮 ===== */
+#miaomiao .mm-rollback{display:block;margin-top:8px;padding:5px 10px;border-radius:8px;
+  border:1px solid #F0D3C8;background:#FFF4EF;color:#B5502F;font-size:12px;cursor:pointer}
+#miaomiao .mm-rollback:hover{background:#FDE8DF}
+#miaomiao .mm-rollback:disabled{opacity:.7;cursor:default;background:#F1F6E8;color:#5F8B2A;border-color:#DCEFC0}

@@ -433,6 +433,7 @@
   }
 
   function answerOffline(q) {
+    if (/宪法|执行规则|你的规则|权限范围/.test(String(arguments[0] || ""))) return constitutionMd();
     refreshData();
     var text = String(q || "").trim();
     if (!text) return "在的，问吧。";
@@ -594,6 +595,8 @@
       "如果用户问的和上面配置有关，直接用【用户当前在计算器里的配置】里的信息。";
 
     // 带上最近几轮对话，让「然后呢」这种追问有上下文
+    turnLedger = newLedger(q);
+    sys = "【执行宪法（必须遵守，代码会强制检查）】\n" + CONSTITUTION.join("\n") + "\n\n" + sys;
     var msgs = [{ role: "system", content: sys }]
       .concat(conv.slice(-MAX_TURNS * 2 - 1, -1))
       .concat([{ role: "user", content: q }]);
@@ -604,7 +607,7 @@
 
   /** 带工具调用的对话循环，最多循环 4 轮 */
   function chatWithTools(msgs, cfg, onDelta, depth, onTrace) {
-    var MAX_LOOP = 4;
+    var MAX_LOOP = 6;
     return fetch(cfg.ep, {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: "Bearer " + cfg.key },
@@ -660,7 +663,7 @@
         var args = {};
         try { args = JSON.parse(fn.arguments || "{}"); } catch (e) {}
         var result;
-        try { result = runTool(fn.name, args); }
+        try { result = guardedRun(fn.name, args); }
         catch (e) { result = { error: e.message }; }
         pendingCalls.push(
           Promise.resolve(result).then(function (res) {
@@ -951,7 +954,7 @@
       inputEl.style.height = "auto";
       if (q) pushMsg("me", q);
 
-      var tryOnline = mode === "online" && cfg && cfg.ep && cfg.key && cfg.model;
+    var tryOnline = mode === "online" && cfg && cfg.ep && cfg.key && cfg.model;
       if (!tryOnline) {
         pushMsg("bot", "图片我看到了，但**离线模式读不了图**。\n\n" +
           "想让喵喵看图，请：\n" +
@@ -1407,6 +1410,105 @@
   }
 
   /** 执行模型发来的工具调用 */
+  /* ============ 执行宪法 ============ */
+  // 每一条都在代码里强制执行，不靠模型自觉
+  var CONSTITUTION = [
+    "第1条 数据第一：数字、名单、回合数必须来自工具结果，不许凭记忆。没调工具就给数字，回答会被标注「未核实」。",
+    "第2条 先读后写：改配置前，本轮必须先读当前状态（get_team 等）。没读就写，会被拦截。",
+    "第3条 可回滚：本轮第一次写入前自动快照。用户可一键撤销本轮全部修改；本轮出错时自动回滚，不留半成品。",
+    "第4条 不越权：用户没提出修改，就不许改配置；「记录回合」「撤销回合」必须是用户明确要求。",
+    "第5条 有预算：每轮最多 20 次工具调用、8 次写入、6 轮循环。超出即停，并汇报做到哪一步。",
+    "第6条 如实汇报：工具失败、被拦截都要告诉用户，不许装作成功。每轮回答末尾附执行记录。"
+  ];
+  var WRITE_TOOLS = { set_pet: 1, set_moves: 1, set_numeric: 1, set_item: 1, switch_slot: 1, set_action: 1, record_turn: 1, undo_turn: 1 };
+  var STATE_READS = { get_team: 1, get_move_cards: 1, get_timeline: 1, get_battle_log: 1, preview_turn: 1, get_matrix: 1 };
+  var DESTRUCTIVE = { record_turn: /记录|记一|记下|记上|走一回合|打一回合/, undo_turn: /撤销|撤回|回退|退回/ };
+  var WRITE_INTENT = /换|改|设|装|切|上场|配|填|记|撤|调整|替|放|帮我|用.{0,6}(打|上)/;
+  var LIMITS = { calls: 20, writes: 8 };
+  var turnLedger = null;
+
+  function newLedger(userText) {
+    return { userText: String(userText || ""), calls: 0, reads: 0, stateRead: false,
+             writes: 0, fails: 0, refused: 0, snapshot: null, log: [] };
+  }
+
+  function refuse(L, name, article, why) {
+    L.refused++;
+    L.log.push({ tool: name, result: "拦截", article: article });
+    return { error: "⚖ 宪法" + article + "拦截：" + why, blocked: true };
+  }
+
+  function isFail(r) { return !r || r.error || r.ok === false; }
+
+  /** 所有工具调用都走这里：先过宪法，再执行，再记账 */
+  function guardedRun(name, args) {
+    var L = turnLedger || (turnLedger = newLedger(""));
+    L.calls++;
+    if (L.calls > LIMITS.calls) return refuse(L, name, "第5条", "本轮工具调用已达 " + LIMITS.calls + " 次上限，停止调用，向用户汇报当前进度");
+
+    if (WRITE_TOOLS[name]) {
+      if (DESTRUCTIVE[name] && !DESTRUCTIVE[name].test(L.userText))
+        return refuse(L, name, "第4条", "用户没有要求" + (name === "record_turn" ? "记录回合" : "撤销回合") + "，不许擅自执行。先问用户要不要做");
+      if (!WRITE_INTENT.test(L.userText))
+        return refuse(L, name, "第4条", "用户这句话没有要求修改配置，只能给建议，不能直接改。问用户是否需要你来改");
+      if (!L.stateRead)
+        return refuse(L, name, "第2条", "写入前必须先读当前状态。先调用 get_team，再决定怎么改");
+      if (L.writes >= LIMITS.writes)
+        return refuse(L, name, "第5条", "本轮写入已达 " + LIMITS.writes + " 次上限");
+      if (L.snapshot == null && window.__miaoSnapshot) L.snapshot = window.__miaoSnapshot();
+      var w;
+      try { w = runTool(name, args); } catch (e) { w = { error: e.message }; }
+      L.writes++;
+      if (isFail(w)) L.fails++;
+      L.log.push({ tool: name, result: isFail(w) ? "失败" : "写入" });
+      return w;
+    }
+
+    L.reads++;
+    if (STATE_READS[name]) L.stateRead = true;
+    var r;
+    try { r = runTool(name, args); } catch (e) { r = { error: e.message }; }
+    return Promise.resolve(r).then(function (x) {
+      if (isFail(x)) L.fails++;
+      L.log.push({ tool: name, result: isFail(x) ? "失败" : "读取" });
+      return x;
+    });
+  }
+
+  /** 第1条 + 第6条：回答末尾的执行记录 */
+  function auditFooter(L, txt) {
+    if (!L) return "";
+    var out = [];
+    if (L.reads === 0 && /\d{2,}/.test(String(txt || "")))
+      out.push("⚠ 本回答没有调用工具核实，里面的数字可能不准（宪法第1条）");
+    if (L.calls > 0)
+      out.push("⚖ 执行记录：读取 " + L.reads + " 次 · 写入 " + L.writes + " 次 · 失败 " + L.fails + " 次 · 拦截 " + L.refused + " 次");
+    return out.length ? "\n\n---\n" + out.join("\n") : "";
+  }
+
+  /** 第3条：一键撤销本轮修改 */
+  function attachRollback(L) {
+    if (!L || !L.writes || !L.snapshot || !listEl) return;
+    var msgs = listEl.querySelectorAll(".mm-msg");
+    var last = msgs[msgs.length - 1];
+    if (!last) return;
+    var snap = L.snapshot;
+    var btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "mm-rollback";
+    btn.textContent = "↶ 撤销本轮 " + L.writes + " 处修改";
+    btn.onclick = function () {
+      var ok = window.__miaoRestore && window.__miaoRestore(snap);
+      btn.disabled = true;
+      btn.textContent = ok ? "✓ 已恢复到本轮之前" : "恢复失败";
+    };
+    last.appendChild(btn);
+  }
+
+  function constitutionMd() {
+    return "**喵喵执行宪法**\n\n" + CONSTITUTION.map(function (x) { return "- " + x; }).join("\n");
+  }
+
   function runTool(name, args) {
     var b = bridge();
     args = args || {};
@@ -2033,6 +2135,7 @@
     conv.push({ role: "user", content: q });
     trimConv();
 
+    if (/宪法|执行规则/.test(q)) { pushMsg("bot", constitutionMd()); return; }
     var tryOnline = mode === "online" && cfg && cfg.ep && cfg.key && cfg.model;
 
     if (!tryOnline) {
@@ -2088,23 +2191,29 @@
       }
     }
 
+    var shownTxt = null;
     answerOnline(q, cfg, onDelta, onTrace).then(function (txt) {
       stop2();
+      shownTxt = txt + auditFooter(turnLedger, txt);
       if (bubble) {
         var bd = bubble.querySelector(".mm-msg");
-        if (bd) bd.innerHTML = mdToHtml(txt);
+        if (bd) bd.innerHTML = mdToHtml(shownTxt);
         scrollBottom();
       }
       return txt;
     }).then(function (txt) {
-      if (!bubble) pushMsg("bot", txt);
+      if (!bubble) pushMsg("bot", shownTxt || txt);
       conv.push({ role: "assistant", content: txt });
       trimConv();
+      attachRollback(turnLedger);
     }).catch(function (e) {
       stop2();
+      var L0 = turnLedger, rolled = "";
+      if (L0 && L0.writes && L0.snapshot && window.__miaoRestore && window.__miaoRestore(L0.snapshot))
+        rolled = "\n\n⚖ 本轮出错，已自动回滚 " + L0.writes + " 处修改（宪法第3条）";
       // 联网失败 → 自动回落到离线引擎，保证总有答案
       var off = answerOffline(q);
-      var fallback = "⚠️ 联网失败：" + e.message +
+      var fallback = "⚠️ 联网失败：" + e.message + rolled +
         "\n\n（已改用离线数据回答 ↓）\n\n" + off;
       pushMsg("bot", fallback);
       conv.push({ role: "assistant", content: fallback });
@@ -2171,6 +2280,7 @@
   }
 
   window.Miao = {
+    constitution: constitutionMd,
     open: open,
     close: close,
     toggle: toggle,

@@ -2880,6 +2880,20 @@
 
   // ===== 给「喵喵」用的受控操作接口 =====
   // 只暴露明确列出的动作，不接受任意代码
+  // 喵喵执行宪法第3条：写入前快照，可整轮回滚
+  window.__miaoSnapshot = function () { try { return JSON.stringify(state); } catch (e) { return ""; } };
+  window.__miaoRestore = function (json) {
+    try {
+      var next = JSON.parse(json);
+      if (!next || !next.mine || !next.foe) return false;
+      state = next;
+      try { normalizeSave(state); } catch (e) {}
+      try { save(); } catch (e) {}
+      renderAll();
+      return true;
+    } catch (e) { return false; }
+  };
+
   window.MiaoBridge = {
     // --- 读 ---
     readState: function () {
