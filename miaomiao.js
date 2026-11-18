@@ -2367,8 +2367,191 @@
     if (dot) dot.className = "mm-live" + (mode === "online" ? "" : " off");
   }
 
+  /* ============ 封面批量识别（B 方案） ============ */
+  /** 调一次视觉模型，返回文本 */
+  function visionCall(dataUrl, prompt) {
+    if (!cfg || !cfg.ep || !cfg.key) return Promise.reject(new Error("先在喵喵设置里填 API Key"));
+    var model = cfg.visionModel || "deepseek-flash";
+    var body = {
+      model: model,
+      messages: [{
+        role: "user",
+        content: [
+          { type: "text", text: prompt },
+          { type: "image_url", image_url: { url: dataUrl } }
+        ]
+      }],
+      temperature: 0.1,
+      max_tokens: 900
+    };
+    return fetch(cfg.ep, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: "Bearer " + cfg.key },
+      body: JSON.stringify(body)
+    }).then(function (r) {
+      return r.text().then(function (t) {
+        var j = {};
+        try { j = JSON.parse(t); } catch (e) {}
+        if (j.error) throw new Error(j.error.message || "接口报错");
+        var c2 = (((j.choices || [])[0] || {}).message || {}).content || "";
+        if (!c2) throw new Error("模型没返回内容");
+        return c2;
+      });
+    });
+  }
+
+  /** URL 图片转 dataURL（bilibili 封面 CORS 是 *，可直接读） */
+  function urlToDataUrl(url) {
+    // B站图有防盗链：带本站 Referer 会 403，必须不传 Referer
+    return fetch(url, { referrerPolicy: "no-referrer", credentials: "omit" }).then(function (r) {
+      if (!r.ok) throw new Error("HTTP " + r.status);
+      return r.blob();
+    }).then(function (blob) {
+      return new Promise(function (resolve, reject) {
+        var rd = new FileReader();
+        rd.onload = function () { resolve(String(rd.result)); };
+        rd.onerror = reject;
+        rd.readAsDataURL(blob);
+      });
+    });
+  }
+
+  var COVER_PROMPT = [
+    "这是洛克王国的视频封面/一图流。",
+    "如果图里列出了精灵队伍（通常 4-8 只精灵名，可能带招式），按下面格式只输出 JSON，不要任何解释：",
+    '{"pets":["精灵名1","精灵名2","精灵名3","精灵名4"],"confidence":"high或low","note":"补充说明"}',
+    "规则：",
+    "- 只认精灵名，不要招式名、不要玩家名、不要标题文字",
+    "- 看不清或图里没有精灵列表 → 输出 {\"pets\":[],\"confidence\":\"low\",\"note\":\"图里没有队伍\"}",
+    "- 不要编造"
+  ].join("\n");
+
+  /** 打开封面识别面板 */
+  function recognizeCovers() {
+    var old = document.getElementById("coverMask");
+    if (old) old.remove();
+    if (!cfg || !cfg.ep || !cfg.key) {
+      alert("先点喵喵右上角 ⚙ 打开设置，填好 API Key 和视觉模型（如 deepseek-flash）");
+      return;
+    }
+    var mask = document.createElement("div");
+    mask.id = "coverMask";
+    mask.className = "cover-mask";
+    mask.innerHTML = [
+      '<div class="cover-box">',
+      '  <div class="cover-hd"><b>B站封面识别</b>',
+      '    <span class="cover-sub">勾选封面 → 视觉模型识别阵容 → 存入队伍库</span>',
+      '    <button type="button" class="cover-x" id="coverClose">×</button></div>',
+      '  <div class="cover-bar">',
+      '    <button type="button" class="teams-btn primary" id="coverRun">识别选中</button>',
+      '    <button type="button" class="teams-btn" id="coverAll">全选</button>',
+      '    <span class="cover-status" id="coverStatus">正在读取采集结果…</span>',
+      '  </div>',
+      '  <div class="cover-grid" id="coverGrid"></div>',
+      '  <div class="cover-out" id="coverOut"></div>',
+      '</div>'
+    ].join("");
+    document.body.appendChild(mask);
+    mask.querySelector("#coverClose").onclick = function () { mask.remove(); };
+    mask.onclick = function (e) { if (e.target === mask) mask.remove(); };
+
+    var items = [];
+    var grid = mask.querySelector("#coverGrid");
+    var status = mask.querySelector("#coverStatus");
+
+    fetch("teams-collected.json?t=" + Date.now())
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (j) {
+        var ev = (j && j.evidence) || [];
+        items = ev.filter(function (x) { return x.cover; }).slice(0, 40);
+        if (!items.length) {
+          grid.innerHTML = '<div class="teams-empty">采集结果里没有封面。先在本机跑：<br><code>node tools/bili-collect.mjs</code></div>';
+          status.textContent = "";
+          return;
+        }
+        grid.innerHTML = items.map(function (x, i) {
+          return '<label class="cover-item"><input type="checkbox" value="' + i + '" checked>' +
+            '<img src="' + x.cover + '" loading="lazy" alt="" referrerpolicy="no-referrer">' +
+            '<span class="cover-t">' + String(x.title || "").slice(0, 22) + '</span></label>';
+        }).join("");
+        status.textContent = "共 " + items.length + " 张封面（已全选）";
+      })
+      .catch(function (e) {
+        grid.innerHTML = '<div class="teams-empty">读取失败：' + e.message + '</div>';
+        status.textContent = "";
+      });
+
+    mask.querySelector("#coverAll").onclick = function () {
+      Array.prototype.forEach.call(grid.querySelectorAll("input[type=checkbox]"), function (c) { c.checked = true; });
+    };
+
+    var running = false;
+    mask.querySelector("#coverRun").onclick = function () {
+      if (running) return;
+      var idx = Array.prototype.filter.call(grid.querySelectorAll("input[type=checkbox]"), function (c) { return c.checked; })
+        .map(function (c) { return Number(c.value); });
+      if (!idx.length) { alert("先勾选封面"); return; }
+      running = true;
+      var out = mask.querySelector("#coverOut");
+      out.innerHTML = "";
+      var ok = 0, empty = 0, fail = 0;
+      var pos = 0;
+
+      function next() {
+        if (pos >= idx.length) {
+          status.textContent = "完成：识别出 " + ok + " 套 · 无队伍 " + empty + " 张 · 失败 " + fail + " 张";
+          running = false;
+          return;
+        }
+        var it = items[idx[pos]];
+        pos++;
+        status.textContent = "识别中 " + pos + "/" + idx.length + "（已存 " + ok + " 套）";
+        var line = document.createElement("div");
+        line.className = "cover-line";
+        line.textContent = "⏳ " + String(it.title || "").slice(0, 26);
+        out.appendChild(line);
+        out.scrollTop = out.scrollHeight;
+
+        urlToDataUrl(it.cover)
+          .then(function (du) { return visionCall(du, COVER_PROMPT); })
+          .then(function (txt) {
+            var data = extractImageData(txt);
+            var pets = (data && data.pets) || [];
+            if (!Array.isArray(pets) || pets.length < 4) {
+              empty++;
+              line.className = "cover-line skip";
+              line.textContent = "— " + String(it.title || "").slice(0, 24) + "（没识别出队伍）";
+              return;
+            }
+            var b = bridge();
+            var r = b && b.saveTeamWithPets ? b.saveTeamWithPets(pets.slice(0, 2).join("·") + "队", pets) : { ok: false };
+            if (r && r.ok) {
+              ok++;
+              line.className = "cover-line done";
+              line.textContent = "✓ " + r.team.name + "：" + pets.join("、");
+            } else {
+              fail++;
+              line.className = "cover-line fail";
+              line.textContent = "✗ " + (r && r.msg || "存失败");
+            }
+          })
+          .catch(function (e) {
+            fail++;
+            line.className = "cover-line fail";
+            line.textContent = "✗ " + String(it.title || "").slice(0, 20) + " — " + e.message.slice(0, 40);
+          })
+          .then(function () {
+            out.scrollTop = out.scrollHeight;
+            setTimeout(next, 400);
+          });
+      }
+      next();
+    };
+  }
+
   window.Miao = {
     constitution: constitutionMd,
+    recognizeCovers: recognizeCovers,
     open: open,
     close: close,
     toggle: toggle,

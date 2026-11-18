@@ -2962,6 +2962,27 @@
     return { ok: true, added: added, skipped: skipped, total: list.length };
   }
 
+  /** 直接用精灵名数组存一套队伍（不用先配进计算器） */
+  function saveTeamWithPets(name, pets, extra) {
+    var list0 = (pets || []).map(function (x) {
+      return typeof x === "string" ? x : (x && (x.n || x.name || x.pet)) || "";
+    }).map(function (s) { return String(s).trim(); }).filter(Boolean).slice(0, 6);
+    if (list0.length < 4) return { ok: false, msg: "至少要有 4 只才能存成队伍（现在 " + list0.length + " 只）" };
+    var list = loadTeams();
+    var team = {
+      id: newTeamId(),
+      name: String(name || "").trim() || (list0.slice(0, 2).join("·") + "队"),
+      pets: list0,
+      moves: [], hp: [],
+      src: (extra && extra.src) || "识别",
+      note: (extra && extra.note) || "",
+      at: Date.now()
+    };
+    list.push(team);
+    saveTeams(list);
+    return { ok: true, team: team, total: list.length };
+  }
+
   function teamsList() { return loadTeams(); }
 
   function teamsLoad(id) {
@@ -3145,6 +3166,7 @@
       '  <div class="teams-bar">',
       '    <button type="button" class="teams-btn primary" id="teamsSave">把当前对手存成队伍</button>',
       '    <button type="button" class="teams-btn" id="teamsImportFile">导入采集结果</button>',
+      '    <button type="button" class="teams-btn" id="teamsCover">封面识别</button>',
       '    <button type="button" class="teams-btn" id="teamsRun">批量计算选中</button>',
       '    <button type="button" class="teams-btn ghost" id="teamsAll">全选</button>',
       '  </div>',
@@ -3191,6 +3213,11 @@
     };
 
     mask.querySelector("#teamsAll").onclick = function () { renderList(true); };
+
+    mask.querySelector("#teamsCover").onclick = function () {
+      if (window.Miao && window.Miao.recognizeCovers) window.Miao.recognizeCovers();
+      else alert("喵喵还没加载完，刷新一下再试");
+    };
 
     mask.querySelector("#teamsImportFile").onclick = function () {
       // 优先读站内采集结果，再退回本地文件
@@ -3689,6 +3716,7 @@
 
     // ===== 队伍库 · 批量测试 =====
     saveTeam: function (name) { return teamsSave(name); },
+    saveTeamWithPets: function (name, pets) { return saveTeamWithPets(name, pets, { src: "识别" }); },
     listTeams: function () { return { ok: true, teams: loadTeams().map(function (t) { return { id: t.id, name: t.name, pets: t.pets, src: t.src }; }) }; },
     loadTeam: function (id) { return teamsLoad(id); },
     deleteTeam: function (id) { return teamsDelete(id); },
@@ -7910,12 +7938,22 @@
           (isTeam ? teamBlock(rec.team) : (sideBlock("mine", "我方") + sideBlock("foe", "对手"))) +
           (rec.notes.length ? "<div class='occ-notes'>已校正：" + rec.notes.slice(0, 8).join("；") + "</div>" : "") +
           "<div class='occ-btns'><button type='button' class='tbtn' data-ok='1'>" + (isTeam ? "导入我方队伍" : "应用到计算器") + "</button>" +
+          (isTeam ? "<button type='button' class='tbtn alt' data-save='1'>存成对手队伍</button>" : "") +
           "<button type='button' class='tbtn ghost' data-cancel='1'>取消</button></div>" +
         "</div>";
       document.body.appendChild(box);
       box.querySelector(".occ-x").onclick = function () { box.remove(); };
       box.querySelector("[data-cancel]").onclick = function () { box.remove(); };
       box.onclick = function (e) { if (e.target === box) box.remove(); };
+      var sv = box.querySelector("[data-save]");
+      if (sv) sv.onclick = function () {
+        var names = (rec.team || []).map(function (x) { return x.pet; }).filter(Boolean);
+        var nm = prompt("存成哪套对手队伍？（默认按前两只命名）", names.slice(0, 2).join("·") + "队");
+        if (nm === null) return;
+        var r2 = saveTeamWithPets(nm, names, { src: "截图识别" });
+        if (r2.ok) { showMsg("已存入队伍库：" + r2.team.name + "（共 " + r2.total + " 套）"); box.remove(); }
+        else alert(r2.msg || "存失败");
+      };
       box.querySelector("[data-ok]").onclick = function () {
         if (isTeam) {
           var r = applyTeam(rec.team);
