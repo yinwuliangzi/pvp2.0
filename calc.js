@@ -2962,6 +2962,139 @@
     return { ok: true, added: added, skipped: skipped, total: list.length };
   }
 
+  /* ============ 队伍有效性检验 ============ */
+  var _petSet = null;
+  function petSet() {
+    if (_petSet) return _petSet;
+    var all = window.__ALL_PETS || window.PETS || [];
+    _petSet = {};
+    all.forEach(function (x) { if (x && x.n) _petSet[String(x.n).trim()] = 1; });
+    return _petSet;
+  }
+
+  /** 编辑距离 */
+  function lev(a, b) {
+    a = String(a); b = String(b);
+    if (a === b) return 0;
+    var m = a.length, n = b.length;
+    if (!m) return n;
+    if (!n) return m;
+    var prev = [], cur = [], i, j;
+    for (j = 0; j <= n; j++) prev[j] = j;
+    for (i = 1; i <= m; i++) {
+      cur[0] = i;
+      for (j = 1; j <= n; j++) {
+        var cost = a.charCodeAt(i - 1) === b.charCodeAt(j - 1) ? 0 : 1;
+        cur[j] = Math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + cost);
+      }
+      prev = cur.slice();
+    }
+    return prev[n];
+  }
+
+  /** 名字归一：精确 → 去括号/后缀 → 包含 → 编辑距离（阈值按长度） */
+  var _nameCache = {};
+  function canonName(raw) {
+    var s = String(raw == null ? "" : raw).trim();
+    if (!s) return { n: "", how: "空" };
+    if (_nameCache[s] !== undefined) return _nameCache[s];
+    var set = petSet();
+    var out = null;
+    if (set[s]) out = { n: s, how: "精确" };
+    if (!out) {
+      var base = s.replace(/（.*?）|\(.*?\)/g, "").replace(/[·・\s]/g, "").trim();
+      if (base && set[base]) out = { n: base, how: "去后缀" };
+      if (!out && base) {
+        // 包含匹配（库名更长的优先）
+        var pool = Object.keys(set).filter(function (k) { return k === base || k.indexOf(base) >= 0 || base.indexOf(k) >= 0; });
+        if (pool.length) {
+          pool.sort(function (a, b) { return Math.abs(a.length - base.length) - Math.abs(b.length - base.length); });
+          out = { n: pool[0], how: "包含" };
+        }
+      }
+      if (!out && base && base.length >= 2) {
+        var best = null, bestD = 99;
+        var keys = Object.keys(set);
+        for (var i = 0; i < keys.length; i++) {
+          var k = keys[i];
+          if (Math.abs(k.length - base.length) > 1) continue;
+          var d = lev(base, k);
+          if (d < bestD) { bestD = d; best = k; if (d === 0) break; }
+        }
+        // 纠错必须有足够相似度，避免把瞎编的名字硬套到真实精灵上
+        var threshold = base.length <= 3 ? 1 : 2;
+        var sim = best ? 1 - bestD / Math.max(base.length, best.length) : 0;
+        if (best && bestD <= threshold && sim >= 0.6) out = { n: best, how: "纠错" + bestD + "(" + Math.round(sim * 100) + "%)" };
+      }
+    }
+    _nameCache[s] = out || { n: "", how: "未收录" };
+    return _nameCache[s];
+  }
+
+  /** 队伍签名：排序后的名字，用于去重与投票 */
+  function teamSig(pets) { return (pets || []).slice().sort().join("|"); }
+
+  /**
+   * 检验一套队伍是否成立
+   * 规则：≥5 只 · 全部能在精灵库解析 · 无重复 · 解析率 ≥0.8
+   */
+  function validateTeam(pets) {
+    var raw = (pets || []).map(function (x) {
+      return typeof x === "string" ? x : (x && (x.n || x.name || x.pet)) || "";
+    }).map(function (s) { return String(s).trim(); }).filter(Boolean);
+    var canon = [], miss = [], how = [];
+    raw.forEach(function (r) {
+      var c = canonName(r);
+      if (c.n) { if (canon.indexOf(c.n) < 0) { canon.push(c.n); how.push(c.how); } }
+      else miss.push(r);
+    });
+    var unique = canon.length;
+    var ratio = raw.length ? unique / raw.length : 0;
+    var reasons = [];
+    if (unique < 5) reasons.push("可解析仅 " + unique + " 只（需 ≥5）");
+    if (miss.length) reasons.push("未收录：" + miss.slice(0, 3).join("、"));
+    if (ratio < 0.8) reasons.push("解析率 " + Math.round(ratio * 100) + "%（需 ≥80%）");
+    var ok = unique >= 5 && ratio >= 0.8;
+    return {
+      ok: ok, pets: canon.slice(0, 6), raw: raw,
+      unique: unique, ratio: Math.round(ratio * 100) / 100,
+      miss: miss, fixed: how.filter(function (h) { return h !== "精确"; }),
+      sig: teamSig(canon.slice(0, 6)),
+      reason: ok ? "通过" : reasons.join("；")
+    };
+  }
+
+  /** 存队伍（带检验 + 签名去重 + 投票累加） */
+  function saveTeamValidated(name, pets, extra) {
+    var v = validateTeam(pets);
+    if (!v.ok) return { ok: false, msg: "未通过检验：" + v.reason, check: v };
+    var list = loadTeams();
+    var hit = list.filter(function (t) { return t.sig === v.sig; })[0];
+    if (hit) {
+      hit.votes = (hit.votes || 1) + 1;
+      hit.lastAt = Date.now();
+      hit.sources = hit.sources || [];
+      if (extra && extra.note) hit.sources.push(String(extra.note).slice(0, 90));
+      if (hit.sources.length > 8) hit.sources = hit.sources.slice(-8);
+      saveTeams(list);
+      return { ok: true, merged: true, team: hit, votes: hit.votes, done: "已有同队，证据 +1", check: v };
+    }
+    var team = {
+      id: newTeamId(),
+      name: String(name || "").trim() || (v.pets.slice(0, 2).join("·") + "队"),
+      pets: v.pets,
+      moves: [], hp: [],
+      src: (extra && extra.src) || "识别",
+      note: (extra && extra.note) || "",
+      sig: v.sig, votes: 1, at: Date.now(),
+      sources: extra && extra.note ? [String(extra.note).slice(0, 90)] : [],
+      fixed: v.fixed
+    };
+    list.push(team);
+    saveTeams(list);
+    return { ok: true, merged: false, team: team, votes: 1, total: list.length, check: v };
+  }
+
   /** 直接用精灵名数组存一套队伍（不用先配进计算器） */
   function saveTeamWithPets(name, pets, extra) {
     var list0 = (pets || []).map(function (x) {
@@ -3722,7 +3855,10 @@
     // ===== 队伍库 · 批量测试 =====
     saveTeam: function (name) { return teamsSave(name); },
     saveTeamWithPets: function (name, pets) { return saveTeamWithPets(name, pets, { src: "识别" }); },
-    listTeams: function () { return { ok: true, teams: loadTeams().map(function (t) { return { id: t.id, name: t.name, pets: t.pets, src: t.src }; }) }; },
+    validateTeam: function (pets) { return validateTeam(pets); },
+    canonName: function (n) { return canonName(n); },
+    saveTeamValidated: function (name, pets, extra) { return saveTeamValidated(name, pets, extra); },
+    listTeams: function () { return { ok: true, teams: loadTeams().map(function (t) { return { id: t.id, name: t.name, pets: t.pets, src: t.src, votes: t.votes || 1, sig: t.sig || "" }; }) }; },
     loadTeam: function (id) { return teamsLoad(id); },
     deleteTeam: function (id) { return teamsDelete(id); },
     importTeams: function (arr) { return teamsImport(arr); },

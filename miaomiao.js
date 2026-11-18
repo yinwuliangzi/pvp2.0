@@ -2367,6 +2367,79 @@
     if (dot) dot.className = "mm-live" + (mode === "online" ? "" : " off");
   }
 
+  /* ============ 最小路径：拼图批量判定 ============ */
+  // 把 9 张帧拼成一张图，一次调用问「哪几格有名单」，把 N 次调用压到 N/9
+
+  /** 拼一张 3x3 联络表，格子上标序号 */
+  function buildContactSheet(imgs, startIdx) {
+    var CW = 300, CH = 169, COLS = 3, ROWS = 3;
+    var cv = document.createElement("canvas");
+    cv.width = CW * COLS; cv.height = (CH + 18) * ROWS;
+    var g = cv.getContext("2d");
+    g.fillStyle = "#111";
+    g.fillRect(0, 0, cv.width, cv.height);
+    imgs.forEach(function (im, i) {
+      var cx = (i % COLS) * CW, cy = Math.floor(i / COLS) * (CH + 18);
+      try { g.drawImage(im, cx, cy, CW, CH); } catch (e) {}
+      g.fillStyle = "rgba(0,0,0,.72)";
+      g.fillRect(cx, cy + CH, CW, 18);
+      g.fillStyle = "#FFFFFF";
+      g.font = "bold 13px sans-serif";
+      g.fillText("#" + (startIdx + i + 1), cx + 6, cy + CH + 14);
+    });
+    return cv.toDataURL("image/jpeg", 0.82);
+  }
+
+  var SCREEN_PROMPT = [
+    "这是一张联络表，由多张游戏截图拼成，每格左上/下方有白色编号（如 #1、#2）。",
+    "任务是判断哪几格里有「精灵名单」：",
+    "• 「场下精灵」面板：竖排 4-6 个精灵名+血条+等级",
+    "• 「一图流」配队图：网格排列的精灵头像和名字",
+    "• 开场一排队友头像",
+    "只输出 JSON，不要解释：",
+    '{"hits":[1,4,7],"note":"简要说明"}',
+    "没有就输出 {\"hits\":[]}。宁可漏判也不要乱判。"
+  ].join("\n");
+
+  /** 对选中的帧做批量初筛，返回命中的下标数组 */
+  function screenFrames(items, groupSize, onProgress) {
+    groupSize = groupSize || 9;
+    var groups = [];
+    for (var i = 0; i < items.length; i += groupSize) groups.push(items.slice(i, i + groupSize));
+
+    var hits = [];
+    var done = 0;
+    return groups.reduce(function (chain, grp, gi) {
+      return chain.then(function () {
+        var start = gi * groupSize;
+        return Promise.all(grp.map(function (x) {
+          return loadImg(x.cover).catch(function () { return null; });
+        })).then(function (imgs) {
+          var valid = imgs.filter(Boolean);
+          if (valid.length < 2) return null;
+          var sheet = buildContactSheet(valid, start);
+          if (onProgress) onProgress(done + 1, groups.length, "初筛 " + (done + 1) + "/" + groups.length);
+          return visionCall(sheet, SCREEN_PROMPT).then(function (txt) {
+            var m = /\{[\s\S]*?\}/.exec(txt);
+            if (m) {
+              try {
+                var j = JSON.parse(m[0]);
+                (j.hits || []).forEach(function (n) {
+                  var idx = Number(n) - 1;
+                  if (idx >= 0 && idx < start + valid.length) hits.push(idx);
+                });
+              } catch (e) {}
+            }
+          }).catch(function (e) {
+            if (onProgress) onProgress(done + 1, groups.length, "初筛失败：" + e.message.slice(0, 30));
+          });
+        }).then(function () { done++; });
+      });
+    }, Promise.resolve()).then(function () {
+      return hits.filter(function (v, i, a) { return a.indexOf(v) === i; });
+    });
+  }
+
   /* ============ 封面批量识别（B 方案） ============ */
   /** 调一次视觉模型，返回文本 */
   function visionCall(dataUrl, prompt) {
@@ -2512,6 +2585,7 @@
       '    <button type="button" class="cover-x" id="coverClose">×</button></div>',
       '  <div class="cover-bar">',
       '    <button type="button" class="teams-btn primary" id="coverRun">识别选中</button>',
+      '    <button type="button" class="teams-btn" id="coverScreen" title="9 张拼一次调用，先挑出有名单的帧">批量初筛（省调用）</button>',
       '    <button type="button" class="teams-btn" id="coverAll">全选</button>',
       '    <span class="cover-status" id="coverStatus">正在读取采集结果…</span>',
       '  </div>',
@@ -2590,6 +2664,40 @@
       Array.prototype.forEach.call(grid.querySelectorAll("input[type=checkbox]"), function (c) { c.checked = true; });
     };
 
+    // 批量初筛：9 张拼一次调用，只勾有名单的
+    var screening = false;
+    mask.querySelector("#coverScreen").onclick = function () {
+      if (screening) return;
+      if (!items.length) { alert("先等缩略图加载完"); return; }
+      screening = true;
+      var btn = this;
+      btn.disabled = true;
+      var out = mask.querySelector("#coverOut");
+      out.innerHTML = "";
+      screenFrames(items, 9, function (i, n, t) {
+        status.textContent = t;
+      }).then(function (hits) {
+        Array.prototype.forEach.call(grid.querySelectorAll("input[type=checkbox]"), function (c) { c.checked = false; });
+        hits.forEach(function (i) {
+          var cb = grid.querySelector('input[value="' + i + '"]');
+          if (cb) cb.checked = true;
+          var lab = grid.querySelector('[data-i="' + i + '"]');
+          if (lab) lab.classList.add("hot");
+        });
+        var saved = items.length - Math.ceil(items.length / 9) - hits.length;
+        status.textContent = "初筛完成：命中 " + hits.length + " 帧 · 已勾选（约省下 " +
+          Math.max(0, saved) + " 次调用）";
+        out.innerHTML = '<div class="cover-line done">批量初筛用了 ' + Math.ceil(items.length / 9) +
+          ' 次调用，筛出 ' + hits.length + ' 帧有名单</div>';
+        screening = false;
+        btn.disabled = false;
+      }).catch(function (e) {
+        status.textContent = "初筛失败：" + e.message.slice(0, 40);
+        screening = false;
+        btn.disabled = false;
+      });
+    };
+
     var running = false;
     mask.querySelector("#coverRun").onclick = function () {
       if (running) return;
@@ -2630,11 +2738,15 @@
             }
             var b = bridge();
             var nm = pets.slice(0, 2).join("·") + "队" + (it.bvid ? "(" + String(it.bvid).slice(2, 8) + ")" : "");
-            var r = b && b.saveTeamWithPets ? b.saveTeamWithPets(nm, pets) : { ok: false };
+            var note = (it.title || "") + (it.bvid ? " · " + it.bvid : "");
+            var r = b && b.saveTeamValidated
+              ? b.saveTeamValidated(nm, pets, { src: isFrame ? "视频帧" : "封面", note: note })
+              : { ok: false, msg: "检验接口未就绪" };
             if (r && r.ok) {
               ok++;
               line.className = "cover-line done";
-              line.textContent = "✓ " + r.team.name + "：" + pets.join("、");
+              line.textContent = (r.merged ? "✓ 重复队（证据 " + r.votes + "）" : "✓ " + r.team.name + "：" + r.check.pets.join("、")) +
+                (r.check.fixed && r.check.fixed.length ? "（纠正 " + r.check.fixed.length + "）" : "");
             } else {
               fail++;
               line.className = "cover-line fail";
