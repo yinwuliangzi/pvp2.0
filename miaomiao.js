@@ -567,7 +567,24 @@
       "【使用流程】\n" + KB.workflow.join("\n"),
       "【计算逻辑】伤害：" + KB.formulas.damage + "；速度：" + KB.formulas.speed +
         "；能量：" + KB.formulas.energy + "；击杀回合：" + KB.formulas.ko,
-      "【已知边界】" + KB.limits.join("；")
+      "【已知边界】" + KB.limits.join("；"),
+      "",
+      "【技能卡字段怎么读】",
+      "- 占对方血量：这一招打掉对方当前血量的百分比",
+      "- 本系加成 ×1.25：技能属性和精灵属性一致时的增伤倍数",
+      "- 能否打死 / 剩余血量：这一击够不够致命",
+      "- 打完剩余次数 N/10：这一招在能量耗尽前能打几次",
+      "- 能量是否够：不够会自动变聚能（浪费一回合）",
+      "- 对手推测：按对方手牌+能量+血量打分，猜他可能出什么（带概率）",
+      "- 局面分：正数代表这一招让你占优，负数代表吃亏",
+      "",
+      "【轮次阶段】",
+      "信息试探 1-4 → 能量压制 5-9 → 发育破局 10-16 → 兑现斩杀 17-24 → 残局收束 25-50",
+      "不同阶段该做的事不同：前期别急着放高耗技能，后期要算斩杀线。",
+      "",
+      "【解读原则】",
+      "用户给你看技能卡或问「用哪招」时，先调 get_move_cards 拿到真实数字，" +
+      "再结合对手推测概率和局面分给出建议，不要只说「看情况」。"
     ].join("\n") + "\n\n" +
       kbText + "\n\n" +
       liveState() + "\n\n" +
@@ -1117,6 +1134,26 @@
     {
       type: "function",
       function: {
+        name: "get_move_cards",
+        description: "读某方 4 个技能的完整技能卡：伤害、占血百分比、本系加成倍数、能不能打死、剩多少血、打完几次（N/10）、能量够不够、对手可能用什么、局面评分。用户问「这招打得死吗」「用哪个技能好」时必须调用。",
+        parameters: {
+          type: "object",
+          properties: { side: { type: "string", enum: ["mine", "foe"], description: "看哪一方的技能" } },
+          required: ["side"]
+        }
+      }
+    },
+    {
+      type: "function",
+      function: {
+        name: "get_timeline",
+        description: "读轮次时间轴：现在第几回合、处在哪个阶段（信息试探/能量压制/发育破局/兑现斩杀/残局收束）、双方魔力。用户问「现在什么阶段」「还剩几回合」时调用。",
+        parameters: { type: "object", properties: {} }
+      }
+    },
+    {
+      type: "function",
+      function: {
         name: "preview_turn",
         description: "预测本回合会发生什么：谁先手、双方打多少伤害、能量变化、会不会倒。用户问「这回合会怎样」「打不打得死」时调用。",
         parameters: { type: "object", properties: {} }
@@ -1338,6 +1375,8 @@
     wiki_search: "查bwiki",
     wiki_page: "读bwiki",
     set_action: "设动作",
+    get_move_cards: "读技能卡",
+    get_timeline: "读时间轴",
     preview_turn: "预测回合",
     record_turn: "记录回合",
     undo_turn: "撤销回合",
@@ -1423,6 +1462,14 @@
       case "set_action":
         if (!b || !b.setAction) return { error: "计算器未就绪" };
         return b.setAction(args.side || "mine", args.act || "attack", args.skill || "");
+
+      case "get_move_cards":
+        if (!b || !b.moveCards) return { error: "计算器未就绪" };
+        return b.moveCards(args.side || "mine");
+
+      case "get_timeline":
+        if (!b || !b.timeline) return { error: "计算器未就绪" };
+        return b.timeline();
 
       case "preview_turn":
         if (!b || !b.battlePreview) return { error: "计算器未就绪" };

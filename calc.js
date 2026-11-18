@@ -3023,6 +3023,67 @@
 
     // ===== 作战模块 =====
 
+    /** 完整技能卡：每招的伤害、本系加成、能不能打死、打完几次、能量够不够、对手推测、局面分 */
+    moveCards: function (side) {
+      try {
+        var sd = side === "foe" ? "foe" : "mine";
+        var cards = window.__lsMoveCards(sd) || [];
+        return {
+          ok: true,
+          side: sd,
+          pet: sideStats(sd).pet.n,
+          hp: state[sd].hp,
+          energy: state[sd].energy,
+          cards: cards.map(function (x) {
+            return {
+              技能: x.name,
+              伤害: x.dmg,
+              占对方血量: x.pct + "%",
+              属性: x.kind,
+              耗能: x.cost,
+              本系加成: x.stab ? ("×" + x.stab) : "无",
+              能否打死: (x.dmg >= (sideStats(sd === "mine" ? "foe" : "mine").stats.hp || 1)) ? "能" : "不能",
+              剩余血量: Math.max(0, (sideStats(sd === "mine" ? "foe" : "mine").stats.hp || 0) - (x.dmg || 0)),
+              能量是否够: x.energyShort ? "不够（会变聚能）" : "够",
+              打完剩余次数: x.preview || "",
+              对手推测: x.predict || "",
+              局面分: x.score,
+              备注: (x.notes || []).join("；")
+            };
+          })
+        };
+      } catch (e) { return { ok: false, msg: e.message }; }
+    },
+
+    /** 轮次时间轴：当前第几回合、处在哪个阶段、总回合数 */
+    timeline: function () {
+      try {
+        var turn = (state.history || []).length + 1;
+        var ph = null;
+        try { ph = window.__lsPhase ? window.__lsPhase() : null; } catch (e) {}
+        var PHASES = [
+          { name: "信息试探", from: 1, to: 4 },
+          { name: "能量压制", from: 5, to: 9 },
+          { name: "发育破局", from: 10, to: 16 },
+          { name: "兑现斩杀", from: 17, to: 24 },
+          { name: "残局收束", from: 25, to: 50 }
+        ];
+        var cur = null;
+        for (var i = 0; i < PHASES.length; i++) {
+          if (turn >= PHASES[i].from && turn <= PHASES[i].to) { cur = PHASES[i]; break; }
+        }
+        return {
+          ok: true,
+          turn: turn,
+          totalTurns: 50,
+          phase: (ph && ph.name) ? ph.name : (cur ? cur.name : "残局收束"),
+          phases: PHASES.map(function (x) { return x.name + " " + x.from + "–" + x.to; }),
+          recorded: (state.history || []).length,
+          mana: { mine: state.mine.mana, foe: state.foe.mana }
+        };
+      } catch (e) { return { ok: false, msg: e.message }; }
+    },
+
     /** 设置某方本回合动作 */
     setAction: function (side, act, skillName) {
       side = side === "foe" ? "foe" : "mine";
