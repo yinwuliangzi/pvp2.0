@@ -741,3 +741,17 @@ body.embed-mode .tabbar { display:none !important; }
 #miaomiao .mm-caret{display:inline-block;width:6px;height:13px;background:#7CBF2E;
   margin-left:2px;vertical-align:-2px;animation:mmCaret .9s steps(2) infinite;border-radius:1px}
 @keyframes mmCaret{0%,50%{opacity:1}51%,100%{opacity:0}}
+
+/* ===== 工具调用轨迹 ===== */
+#miaomiao .mm-trace-row{align-items:flex-start}
+#miaomiao .mm-trace{display:flex;flex-direction:column;gap:4px;padding:8px 11px;
+  background:#F4F9EA;border:1px dashed #CFE4A8;border-radius:11px;
+  border-bottom-left-radius:5px;max-width:calc(100% - 70px);font-size:11.5px}
+#miaomiao .mm-trace-line{display:flex;align-items:center;gap:5px;color:#5E7A35;line-height:1.5}
+#miaomiao .mm-trace-line b{color:#3E5C1A;font-weight:700}
+#miaomiao .mm-trace-line .mm-gear-icon{font-style:normal;font-size:10px;opacity:.65;
+  display:inline-block;animation:mmSpin 1.2s linear infinite}
+@keyframes mmSpin{to{transform:rotate(360deg)}}
+#miaomiao .mm-trace-line.bad{color:#C9503C}
+#miaomiao .mm-trace-bad{font-size:10px;background:#FBE7E2;color:#C9503C;
+  padding:0 5px;border-radius:4px}

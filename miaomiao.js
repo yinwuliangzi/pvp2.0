@@ -519,7 +519,7 @@
   }
 
   /* ============ 在线（接大模型） ============ */
-  function answerOnline(q, cfg, onDelta) {
+  function answerOnline(q, cfg, onDelta, onTrace) {
     refreshData();
     // 把相关数据塞进上下文，让模型基于真实数据回答
     var pets = extractPet(String(q || ""));
@@ -545,12 +545,30 @@
       "对位回合差：" + KB.formulas.rounds +
       "\n\n【注意事项】\n" + KB.notes.concat(KB.limits).map(function (x) { return "• " + x; }).join("\n");
 
-    var sys = "你是「喵喵」，洛克王国 PVP 对战助手，内嵌在「对战助手」网站里。" +
-      "你对这个计算器的功能和计算逻辑了如指掌，可以指导用户怎么用它。\n\n" +
-      "规则：\n" +
-      "1. 只依据下面给出的数据回答；数据里没有就说不知道，绝不编造精灵名、技能名或数值\n" +
-      "2. 回答用中文，简洁、分点\n" +
-      "3. 用户问怎么用这个工具时，按【使用流程】【计算逻辑】来答\n\n" +
+    var sys = [
+      "你是「喵喵」，一个对战计算器的操作型助手。你不是聊天机器人，是个会动手的执行者。",
+      "",
+      "【最重要的一条】只要你需要数字、名单、属性、回合数，就必须先调用工具去算，不许凭记忆回答。",
+      "工具已经接在真实计算器上：算伤害、查精灵、筛队友、读阵容、改配置，都是真实数据。",
+      "",
+      "【怎么回答】",
+      "1. 先判断需要什么数据 → 调工具拿到 → 再回答。一轮可以调多个工具。",
+      "2. 回答直接给结论和数字。禁止客套话（「好的」「让我来帮你」「希望对你有帮助」这类一律不要）。",
+      "3. 不要复述工具返回的原始 JSON，把它翻译成人话和数字。",
+      "4. 用户让你改配置（换精灵、改配招、改血量）就直接调用对应工具真的改掉，然后告诉他改成了什么。",
+      "5. 数据里没有的就说没有，别编。",
+      "",
+      "【格式】",
+      "- 用 Markdown：小标题、短句、要点列表",
+      "- 数字带单位（回合、点、%）",
+      "- 一般不超过 300 字，除非用户要详细分析",
+      "",
+      "【这是什么工具】" + KB.about,
+      "【使用流程】\n" + KB.workflow.join("\n"),
+      "【计算逻辑】伤害：" + KB.formulas.damage + "；速度：" + KB.formulas.speed +
+        "；能量：" + KB.formulas.energy + "；击杀回合：" + KB.formulas.ko,
+      "【已知边界】" + KB.limits.join("；")
+    ].join("\n") + "\n\n" +
       kbText + "\n\n" +
       liveState() + "\n\n" +
       "【本次问题相关的精灵数据】\n" + (ctx || "（本次问题没有匹配到精灵）") +
@@ -564,11 +582,11 @@
       .concat([{ role: "user", content: q }]);
 
     // 先走「带工具的对话循环」；模型不需要工具时会直接回答
-    return chatWithTools(msgs, cfg, onDelta, 0);
+    return chatWithTools(msgs, cfg, onDelta, 0, onTrace);
   }
 
   /** 带工具调用的对话循环，最多循环 4 轮 */
-  function chatWithTools(msgs, cfg, onDelta, depth) {
+  function chatWithTools(msgs, cfg, onDelta, depth, onTrace) {
     var MAX_LOOP = 4;
     return fetch(cfg.ep, {
       method: "POST",
@@ -609,7 +627,7 @@
             return chatWithTools(msgs.concat([
               { role: "assistant", content: msg.content || "" },
               { role: "user", content: "请直接给出完整回答。" }
-            ]), cfg, onDelta, depth + 1);
+            ]), cfg, onDelta, depth + 1, onTrace);
           }
           throw new Error("模型返回空内容");
         }
@@ -626,6 +644,9 @@
         var result;
         try { result = runTool(fn.name, args); }
         catch (e) { result = { error: e.message }; }
+        if (typeof onTrace === "function") {
+          onTrace(toolTrace(fn.name, args, result));
+        }
         toolMsgs.push({
           role: "tool",
           tool_call_id: c.id,
@@ -639,7 +660,7 @@
       }
 
       // 把工具结果交回模型，让它基于真实数据回答
-      return chatWithTools(msgs.concat(toolMsgs), cfg, onDelta, depth + 1);
+      return chatWithTools(msgs.concat(toolMsgs), cfg, onDelta, depth + 1, onTrace);
     });
   }
 
@@ -1049,6 +1070,83 @@
     {
       type: "function",
       function: {
+        name: "set_pet",
+        description: "把某只精灵放进计算器某个格子。当用户说「帮我换上 X」「把第 3 个改成 X」时调用。",
+        parameters: {
+          type: "object",
+          properties: {
+            side: { type: "string", enum: ["mine", "foe"] },
+            slot: { type: "number", description: "第几格，0-5（用户说第 3 个就传 2）" },
+            name: { type: "string", description: "精灵名" }
+          },
+          required: ["side", "slot", "name"]
+        }
+      }
+    },
+    {
+      type: "function",
+      function: {
+        name: "set_moves",
+        description: "设置某方当前在场精灵的 4 个招式。当用户说「配招改成 A、B、C、D」时调用。",
+        parameters: {
+          type: "object",
+          properties: {
+            side: { type: "string", enum: ["mine", "foe"] },
+            moves: { type: "array", items: { type: "string" }, description: "4 个技能名，按顺序" }
+          },
+          required: ["side", "moves"]
+        }
+      }
+    },
+    {
+      type: "function",
+      function: {
+        name: "set_numeric",
+        description: "改某方的数值。当用户说「把血量改成 250」时调用。",
+        parameters: {
+          type: "object",
+          properties: {
+            side: { type: "string", enum: ["mine", "foe"] },
+            key: { type: "string", enum: ["hp", "energy", "mana", "level", "star"] },
+            value: { type: "number" }
+          },
+          required: ["side", "key", "value"]
+        }
+      }
+    },
+    {
+      type: "function",
+      function: {
+        name: "set_item",
+        description: "设置某方装备的道具：evolve=进化之力 / resonance=愿力强化 / heal=光合治愈。",
+        parameters: {
+          type: "object",
+          properties: {
+            side: { type: "string", enum: ["mine", "foe"] },
+            item: { type: "string", enum: ["evolve", "resonance", "heal"] }
+          },
+          required: ["side", "item"]
+        }
+      }
+    },
+    {
+      type: "function",
+      function: {
+        name: "switch_slot",
+        description: "把某方的当前编辑格子切到第 N 只。",
+        parameters: {
+          type: "object",
+          properties: {
+            side: { type: "string", enum: ["mine", "foe"] },
+            slot: { type: "number", description: "0-5" }
+          },
+          required: ["side", "slot"]
+        }
+      }
+    },
+    {
+      type: "function",
+      function: {
         name: "browse_skills",
         description: "按属性筛技能，用于配招。",
         parameters: {
@@ -1064,6 +1162,39 @@
       }
     }
   ];
+
+  var TOOL_LABEL = {
+    calc_damage: "算伤害",
+    get_pet: "查精灵",
+    get_skill: "查技能",
+    get_team: "读阵容",
+    get_matrix: "算对位",
+    find_teammates: "筛队友",
+    browse_skills: "筛技能",
+    set_pet: "换精灵",
+    set_moves: "改配招",
+    set_numeric: "改数值",
+    set_item: "换道具",
+    switch_slot: "切格子"
+  };
+
+  /** 把工具调用摘要成一行人话，例如「查精灵 武斗酷猫」 */
+  function toolTrace(name, args, result) {
+    var label = TOOL_LABEL[name] || name;
+    var what = "";
+    if (args) {
+      if (args.name) what = args.name;
+      else if (args.skill) what = args.skill;
+      else if (args.element) what = args.element + "系";
+      else if (args.moves) what = args.moves.filter(Boolean).join("、");
+      else if (args.key) what = args.key + "=" + args.value;
+      else if (args.item) what = args.item;
+      else if (args.resist) what = "抗" + args.resist.join("/");
+      else if (typeof args.slot === "number") what = "第" + (args.slot + 1) + "格" + (args.name ? " " + args.name : "");
+    }
+    var bad = result && (result.error || result.ok === false);
+    return { label: label, what: what, bad: !!bad, msg: result && result.msg };
+  }
 
   /** 执行模型发来的工具调用 */
   function runTool(name, args) {
@@ -1109,6 +1240,37 @@
         out.sort(function (a, b2) { return (b2.hp + b2.md) - (a.hp + a.md); });
         return { count: out.length, list: out.slice(0, lim) };
       }
+
+      case "set_pet":
+        if (!b || !b.setPet) return { error: "计算器未就绪" };
+        return b.setPet(args.side || "mine", Number(args.slot) || 0, args.name || "");
+
+      case "set_moves":
+        if (!b || !b.setMoves) return { error: "计算器未就绪" };
+        return b.setMoves(args.side || "mine", Array.isArray(args.moves) ? args.moves : []);
+
+      case "set_numeric":
+        if (!b || !b.setNumeric) return { error: "计算器未就绪" };
+        return b.setNumeric(args.side || "mine", args.key || "hp", Number(args.value));
+
+      case "set_item": {
+        var stItem = state && state[args.side || "mine"];
+        if (!b) return { error: "计算器未就绪" };
+        try {
+          var sd = args.side === "foe" ? "foe" : "mine";
+          var sel = document.getElementById(sd + "Item");
+          if (sel) {
+            sel.value = args.item;
+            sel.dispatchEvent(new Event("change", { bubbles: true }));
+            return { ok: true, msg: (sd === "mine" ? "我方" : "对方") + " 装备 " + ((ITEM_DEFS[args.item] || {}).n || args.item) };
+          }
+          return { error: "找不到道具下拉" };
+        } catch (e) { return { error: e.message }; }
+      }
+
+      case "switch_slot":
+        if (!b || !b.switchSlot) return { error: "计算器未就绪" };
+        return b.switchSlot(args.side || "mine", Number(args.slot) || 0);
 
       case "browse_skills": {
         var pool2 = SKILLS.filter(function (s) {
@@ -1542,6 +1704,27 @@
     var btn2 = box.querySelector("#mmSend");
     if (btn2) btn2.disabled = true;
 
+    // 工具轨迹：显示「查精灵 武斗酷猫」这类执行记录
+    var traceRow = null, traceBox = null;
+    function onTrace(t) {
+      if (!traceRow) {
+        stop2();
+        traceRow = document.createElement("div");
+        traceRow.className = "mm-row bot mm-trace-row";
+        traceRow.innerHTML = '<div class="mm-mini"><img src="icons/miaomiao-avatar.png" alt=""></div>' +
+          '<div class="mm-trace" id="mmTrace"></div>';
+        listEl.appendChild(traceRow);
+        traceBox = traceRow.querySelector("#mmTrace");
+      }
+      var line = document.createElement("div");
+      line.className = "mm-trace-line" + (t.bad ? " bad" : "");
+      line.innerHTML = '<i class="mm-gear-icon">⚙</i> ' + t.label +
+        (t.what ? " <b>" + esc(t.what) + "</b>" : "") +
+        (t.bad ? ' <span class="mm-trace-bad">失败</span>' : "");
+      traceBox.appendChild(line);
+      scrollBottom();
+    }
+
     // 流式：第一个字到达时把「思考中」换成气泡，然后逐字刷新
     var bubble = null, acc = "";
     function onDelta(piece, full) {
@@ -1557,7 +1740,7 @@
       }
     }
 
-    answerOnline(q, cfg, onDelta).then(function (txt) {
+    answerOnline(q, cfg, onDelta, onTrace).then(function (txt) {
       stop2();
       if (bubble) {
         var bd = bubble.querySelector(".mm-msg");
