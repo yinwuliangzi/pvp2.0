@@ -583,6 +583,12 @@
       "信息试探 1-4 → 能量压制 5-9 → 发育破局 10-16 → 兑现斩杀 17-24 → 残局收束 25-50",
       "不同阶段该做的事不同：前期别急着放高耗技能，后期要算斩杀线。",
       "",
+      "【你能直接做的事（不要说没有）】",
+      "- 用户给 6 个精灵名 → 调 create_foe_team 直接建队伍入库，不要让他去跑脚本",
+      "- 队伍库里没有队伍 → 可以 open_panel(manual) 打开手动录入",
+      "- 视频帧识别 / 封面识别 → open_panel(frames|cover)，需要用户自己的 API Key",
+      "- B站采集 / 抽帧是本地 Node 脚本，不在你的工具里，但你可以 open_panel(collect) 让用户看设置",
+      "",
       "【解读原则】",
       "用户给你看技能卡或问「用哪招」时，先调 get_move_cards 拿到真实数字，" +
       "再结合对手推测概率和局面分给出建议，不要只说「看情况」。"
@@ -1200,6 +1206,36 @@
     {
       type: "function",
       function: {
+        name: "create_foe_team",
+        description: "用用户给的 6 个精灵名直接建一套对手队伍并存进队伍库。用户说「这 6 只：A、B、C、D、E、F」时立刻调用，不要推托说没有采集工具。",
+        parameters: {
+          type: "object",
+          properties: {
+            name: { type: "string", description: "队伍名，可留空" },
+            pets: { type: "array", items: { type: "string" }, description: "6 个精灵名" },
+            fillCalculator: { type: "boolean", description: "是否同时填进计算器的对方 6 格" }
+          },
+          required: ["pets"]
+        }
+      }
+    },
+    {
+      type: "function",
+      function: {
+        name: "open_panel",
+        description: "打开计算器里的功能面板。用户说「打开队伍库」「我要截图识别」时用它，不要说自己没有这个功能。",
+        parameters: {
+          type: "object",
+          properties: {
+            panel: { type: "string", enum: ["teams", "manual", "check", "collect", "frames", "covers"], description: "teams=队伍库 manual=手动录入 check=配队体检 collect=采集设置 frames=视频帧识别 covers=封面识别" }
+          },
+          required: ["panel"]
+        }
+      }
+    },
+    {
+      type: "function",
+      function: {
         name: "list_foe_teams",
         description: "列出队伍库里保存的对手队伍。用户问「我存了哪些队伍」时调用。",
         parameters: { type: "object", properties: {} }
@@ -1427,6 +1463,8 @@
     undo_turn: "撤销回合",
     get_battle_log: "读战报",
     simulate_battle: "模拟对战",
+    create_foe_team: "建队伍",
+    open_panel: "开面板",
     list_foe_teams: "列队伍",
     save_foe_team: "存队伍",
     batch_test_teams: "批量测队",
@@ -1638,6 +1676,30 @@
       case "simulate_battle":
         if (!b || !b.simulate) return { error: "计算器未就绪" };
         return b.simulate(Number(args.games) || 60);
+
+      case "create_foe_team": {
+        if (!b || !b.createTeam) return { error: "计算器未就绪" };
+        var r = b.createTeam(args.name || "", args.pets || []);
+        if (r && r.ok && args.fillCalculator) {
+          try { b.fillFoeTeam(r.team.pets); } catch (e) {}
+        }
+        return r;
+      }
+
+      case "open_panel": {
+        var P = {
+          teams: function () { if (window.__openTeamsPanel) window.__openTeamsPanel(); },
+          manual: function () { if (window.__openManualTeam) window.__openManualTeam(); },
+          check: function () { if (window.__openTeamCheck) window.__openTeamCheck(); },
+          collect: function () { if (window.__openCollectConfig) window.__openCollectConfig(); },
+          frames: function () { if (window.Miao && Miao.recognizeCovers) Miao.recognizeCovers("frame"); },
+          covers: function () { if (window.Miao && Miao.recognizeCovers) Miao.recognizeCovers("cover"); }
+        };
+        var fn = P[args.panel];
+        if (!fn) return { error: "未知面板" };
+        try { fn(); return { ok: true, msg: "已打开 " + args.panel }; }
+        catch (e) { return { error: e.message }; }
+      }
 
       case "list_foe_teams": {
         if (!b || !b.listTeams) return { error: "计算器未就绪" };

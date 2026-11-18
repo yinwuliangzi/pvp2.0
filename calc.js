@@ -3655,6 +3655,83 @@
   window.__openTeamCheck = openTeamCheck;
   window.__openCollectConfig = openCollectConfig;
 
+  /* ============ 手动录入队伍 ============ */
+  function openManualTeam(prefill) {
+    var old = document.getElementById("manMask");
+    if (old) old.remove();
+    var mask = document.createElement("div");
+    mask.id = "manMask";
+    mask.className = "teams-mask";
+    mask.innerHTML = '<div class="teams-box" style="width:min(560px,100%)">' +
+      '<div class="teams-hd"><b>手动录入队伍</b><span class="teams-sub">6 只名字，顿号/逗号/换行都行</span>' +
+      '<button type="button" class="teams-x" id="manClose">×</button></div>' +
+      '<div class="cfg-body">' +
+      '  <div class="cfg-row"><label>队名</label><input id="manName" class="man-input" placeholder="留空自动取前两只命名"></div>' +
+      '  <div class="cfg-row"><label>精灵</label><textarea id="manPets" rows="3" placeholder="例如：迷嶂布莱克、圣剑骑士、武斗酷猫、飞飞钥、贝古斯、棋契陛下">' + (prefill || "") + "</textarea></div>" +
+      '  <div class="man-preview" id="manPreview"></div>' +
+      '  <div class="teams-bar" style="border:0;padding:0"><button type="button" class="teams-btn primary" id="manSave">存入队伍库</button>' +
+      '  <button type="button" class="teams-btn" id="manToCalc">同时填进计算器</button></div>' +
+      "</div></div>";
+    document.body.appendChild(mask);
+    mask.querySelector("#manClose").onclick = function () { mask.remove(); };
+    mask.onclick = function (e) { if (e.target === mask) mask.remove(); };
+
+    function parse() {
+      return String(mask.querySelector("#manPets").value || "")
+        .split(/[、,，;；\s\n]+/).map(function (s) { return s.trim(); }).filter(Boolean).slice(0, 6);
+    }
+    function preview() {
+      var names = parse();
+      var box = mask.querySelector("#manPreview");
+      if (!names.length) { box.innerHTML = ""; return; }
+      var v = validateTeam(names);
+      box.innerHTML = (v.ok
+        ? '<div class="man-ok">✓ 通过检验：' + v.pets.join("、") + (v.fixed.length ? "（纠正 " + v.fixed.join(",") + "）" : "") + "</div>"
+        : '<div class="man-bad">✗ ' + v.reason + "</div>") +
+        (v.miss.length ? '<div class="man-miss">未收录：' + v.miss.join("、") + "</div>" : "");
+    }
+    mask.querySelector("#manPets").addEventListener("input", preview);
+    preview();
+
+    mask.querySelector("#manSave").onclick = function () {
+      var names = parse();
+      var nm = String(mask.querySelector("#manName").value || "").trim();
+      var r = saveTeamValidated(nm, names, { src: "手动", note: "手动录入" });
+      if (r.ok) {
+        mask.remove();
+        showToast(r.merged ? "已有这套队伍，证据 +1" : "已存入：" + r.team.name);
+      } else {
+        alert(r.msg);
+      }
+    };
+    mask.querySelector("#manToCalc").onclick = function () {
+      var names = parse();
+      var v = validateTeam(names);
+      if (!v.ok) { alert("先通过检验：" + v.reason); return; }
+      state.foe.slots = v.pets.slice(0, 6);
+      while (state.foe.slots.length < 6) state.foe.slots.push("");
+      state.foe.slotProfiles = {};
+      state.foe.active = 0;
+      loadSlotProfile("foe", 0);
+      try { save(); } catch (e) {}
+      try { renderAll(); } catch (e) {}
+      mask.remove();
+      showToast("已填进计算器「对方」6 格");
+    };
+  }
+
+  /** 轻提示 */
+  function showToast(msg) {
+    var t = document.createElement("div");
+    t.className = "man-toast";
+    t.textContent = msg;
+    document.body.appendChild(t);
+    setTimeout(function () { t.classList.add("out"); }, 1600);
+    setTimeout(function () { t.remove(); }, 2200);
+  }
+
+  window.__openManualTeam = openManualTeam;
+
   /* ============ 队伍库面板 ============ */
   function openTeamsPanel() {
     var old = document.getElementById("teamsMask");
@@ -3670,6 +3747,7 @@
       '    <button type="button" class="teams-x" id="teamsClose">×</button></div>',
       '  <div class="teams-bar">',
       '    <button type="button" class="teams-btn primary" id="teamsSave">把当前对手存成队伍</button>',
+      '    <button type="button" class="teams-btn" id="teamsManual">手动录入</button>',
       '    <button type="button" class="teams-btn" id="teamsImportFile">导入采集结果</button>',
       '    <button type="button" class="teams-btn" id="teamsCover">封面识别</button>',
       '    <button type="button" class="teams-btn" id="teamsFrames">视频帧识别</button>',
@@ -3726,6 +3804,7 @@
       if (window.Miao && window.Miao.recognizeCovers) window.Miao.recognizeCovers("cover");
       else alert("喵喵还没加载完，刷新一下再试");
     };
+    mask.querySelector("#teamsManual").onclick = function () { openManualTeam(); };
     mask.querySelector("#teamsCheck").onclick = function () { openTeamCheck(); };
     mask.querySelector("#teamsCfg").onclick = function () { openCollectConfig(); };
     mask.querySelector("#teamsFrames").onclick = function () {
@@ -4233,6 +4312,19 @@
     saveTeamWithPets: function (name, pets) { return saveTeamWithPets(name, pets, { src: "识别" }); },
     validateTeam: function (pets) { return validateTeam(pets); },
     evaluateTeam: function (opt) { return evaluateTeam(opt); },
+    createTeam: function (name, pets) { return saveTeamValidated(name, pets, { src: "对话" }); },
+    fillFoeTeam: function (pets) {
+      var v = validateTeam(pets);
+      if (!v.ok) return { ok: false, msg: v.reason };
+      state.foe.slots = v.pets.slice(0, 6);
+      while (state.foe.slots.length < 6) state.foe.slots.push("");
+      state.foe.slotProfiles = {};
+      state.foe.active = 0;
+      loadSlotProfile("foe", 0);
+      try { save(); } catch (e) {}
+      try { renderAll(); } catch (e) {}
+      return { ok: true, pets: v.pets };
+    },
     canonName: function (n) { return canonName(n); },
     saveTeamValidated: function (name, pets, extra) { return saveTeamValidated(name, pets, extra); },
     listTeams: function () { return { ok: true, teams: loadTeams().map(function (t) { return { id: t.id, name: t.name, pets: t.pets, src: t.src, votes: t.votes || 1, sig: t.sig || "" }; }) }; },
