@@ -2787,11 +2787,32 @@
         out.appendChild(line);
         out.scrollTop = out.scrollHeight;
 
+        var STRICT = (isFrame ? FRAME_PROMPT : COVER_PROMPT) +
+          "\n\n【重要】上一轮识别可能不准。这次只输出你 100% 确定的精灵名，宁可少写不要猜。";
+
         urlToDataUrl(it.cover)
-          .then(function (du) { return visionCall(du, isFrame ? FRAME_PROMPT : COVER_PROMPT); })
+          .then(function (du) {
+            return visionCall(du, isFrame ? FRAME_PROMPT : COVER_PROMPT).catch(function () {
+              return visionCall(du, STRICT);
+            });
+          })
           .then(function (txt) {
             var data = extractImageData(txt);
             var pets = (data && data.pets) || [];
+            // 校验没过 → 用严格模式重试一次
+            if (pets.length < 4 || !(window.MiaoBridge && window.MiaoBridge.validateTeam && window.MiaoBridge.validateTeam(pets).ok)) {
+              return urlToDataUrl(it.cover)
+                .then(function (du2) { return visionCall(du2, STRICT); })
+                .then(function (txt2) {
+                  var d2 = extractImageData(txt2);
+                  var p2 = (d2 && d2.pets) || [];
+                  return p2.length >= pets.length ? p2 : pets;
+                })
+                .catch(function () { return pets; });
+            }
+            return pets;
+          })
+          .then(function (pets) {
             if (!Array.isArray(pets) || pets.length < 4) {
               empty++;
               line.className = "cover-line skip";
@@ -2809,6 +2830,14 @@
               line.className = "cover-line done";
               line.textContent = (r.merged ? "✓ 重复队（证据 " + r.votes + "）" : "✓ " + r.team.name + "：" + r.check.pets.join("、")) +
                 (r.check.fixed && r.check.fixed.length ? "（纠正 " + r.check.fixed.length + "）" : "");
+              var eb = document.createElement("button");
+              eb.type = "button";
+              eb.className = "cover-edit";
+              eb.textContent = "改一下";
+              eb.onclick = function () {
+                if (window.__openTeamEdit) window.__openTeamEdit(r.team.id);
+              };
+              line.appendChild(eb);
             } else {
               fail++;
               line.className = "cover-line fail";

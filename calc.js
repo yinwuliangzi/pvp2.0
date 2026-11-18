@@ -3790,6 +3790,73 @@
   window.__openTeamCheck = openTeamCheck;
   window.__openCollectConfig = openCollectConfig;
 
+  /** 原地更新一套队伍（保留 id / 票数 / 来源） */
+  function updateTeam(id, name, pets) {
+    var list = loadTeams();
+    var t = list.filter(function (x) { return x.id === id; })[0];
+    if (!t) return { ok: false, msg: "找不到这套队伍" };
+    var v = validateTeam(pets);
+    if (!v.ok) return { ok: false, msg: v.reason, check: v };
+    t.pets = v.pets;
+    t.sig = v.sig;
+    if (name != null && String(name).trim()) t.name = String(name).trim();
+    t.fixed = v.fixed;
+    t.editedAt = Date.now();
+    saveTeams(list);
+    return { ok: true, team: t, check: v };
+  }
+
+  /** 编辑弹窗（复用手动录入界面） */
+  function openTeamEdit(id) {
+    var t = loadTeams().filter(function (x) { return x.id === id; })[0];
+    if (!t) return;
+    var old = document.getElementById("manMask");
+    if (old) old.remove();
+    var mask = document.createElement("div");
+    mask.id = "manMask";
+    mask.className = "teams-mask";
+    mask.innerHTML = '<div class="teams-box" style="width:min(560px,100%)">' +
+      '<div class="teams-hd"><b>编辑队伍</b><span class="teams-sub">改完自动重新校验</span>' +
+      '<button type="button" class="teams-x" id="manClose">×</button></div>' +
+      '<div class="cfg-body">' +
+      '  <div class="cfg-row"><label>队名</label><input id="manName" class="man-input" value="' + String(t.name || "").replace(/"/g, "&quot;") + '"></div>' +
+      '  <div class="cfg-row"><label>精灵</label><textarea id="manPets" rows="3">' + t.pets.join("、") + "</textarea></div>" +
+      '  <div class="man-preview" id="manPreview"></div>' +
+      '  <div class="teams-bar" style="border:0;padding:0"><button type="button" class="teams-btn primary" id="manSave">保存修改</button>' +
+      '  <button type="button" class="teams-btn" id="manDelete" style="color:#C9503C">删除这套</button></div>' +
+      "</div></div>";
+    document.body.appendChild(mask);
+    mask.querySelector("#manClose").onclick = function () { mask.remove(); };
+    mask.onclick = function (e) { if (e.target === mask) mask.remove(); };
+    function parse() {
+      return String(mask.querySelector("#manPets").value || "")
+        .split(/[、,，;；\s\n]+/).map(function (s) { return s.trim(); }).filter(Boolean).slice(0, 6);
+    }
+    function preview() {
+      var v = validateTeam(parse());
+      mask.querySelector("#manPreview").innerHTML = v.ok
+        ? '<div class="man-ok">✓ ' + v.pets.join("、") + (v.fixed.length ? "（纠正 " + v.fixed.join(",") + "）" : "") + "</div>"
+        : '<div class="man-bad">✗ ' + v.reason + "</div>" +
+          (v.miss.length ? '<div class="man-miss">未收录：' + v.miss.join("、") + "</div>" : "");
+    }
+    mask.querySelector("#manPets").addEventListener("input", preview);
+    preview();
+    mask.querySelector("#manSave").onclick = function () {
+      var r = updateTeam(id, mask.querySelector("#manName").value, parse());
+      if (r.ok) { mask.remove(); showToast("已保存：" + r.team.name); if (window.__refreshTeamsList) window.__refreshTeamsList(); }
+      else alert(r.msg);
+    };
+    mask.querySelector("#manDelete").onclick = function () {
+      if (!confirm("删除「" + t.name + "」？")) return;
+      teamsDelete(id);
+      mask.remove();
+      showToast("已删除");
+      if (window.__refreshTeamsList) window.__refreshTeamsList();
+    };
+  }
+
+  window.__openTeamEdit = openTeamEdit;
+
   /* ============ 手动录入队伍 ============ */
   function openManualTeam(prefill) {
     var old = document.getElementById("manMask");
@@ -3959,7 +4026,8 @@
         return '<label class="teams-item"><input type="checkbox" value="' + t.id + '"' + (selectAll ? " checked" : "") + '>' +
           '<span class="teams-name">' + (t.name || ("队伍" + (i + 1))) + '</span>' +
           '<span class="teams-pets">' + t.pets.join("、") + '</span>' +
-          '<span class="teams-src">' + (t.src || "") + '</span>' +
+          '<span class="teams-src">' + (t.src || "") + (t.votes > 1 ? " ·" + t.votes + "票" : "") + '</span>' +
+          '<button type="button" class="teams-edit" data-id="' + t.id + '" title="编辑">改</button>' +
           '<button type="button" class="teams-del" data-id="' + t.id + '" title="删除">×</button></label>';
       }).join("");
       Array.prototype.forEach.call(box.querySelectorAll(".teams-del"), function (b) {
@@ -3969,6 +4037,13 @@
           renderList(false);
         };
       });
+      Array.prototype.forEach.call(box.querySelectorAll(".teams-edit"), function (b) {
+        b.onclick = function (e) {
+          e.preventDefault();
+          openTeamEdit(b.getAttribute("data-id"));
+        };
+      });
+      window.__refreshTeamsList = function () { renderList(false); };
     }
     renderList(false);
 
@@ -4523,6 +4598,7 @@
       return { ok: true, teams: f.map(function (t) { return { id: t.id, name: t.name, pets: t.pets, src: t.src, side: t.side || "foe", votes: t.votes || 1, sig: t.sig || "" }; }) };
     },
     saveMyTeam: function (name) { return myTeamsSave(name); },
+    updateTeam: function (id, name, pets) { return updateTeam(id, name, pets); },
     compareMyTeams: function (myIds, foeIds, opt) { return compareMyTeams(myIds, foeIds, opt); },
     loadTeam: function (id) { return teamsLoad(id); },
     deleteTeam: function (id) { return teamsDelete(id); },
