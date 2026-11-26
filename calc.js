@@ -14,7 +14,20 @@
     window.PETS_SUPPLEMENT.forEach(function (x) {
       if (!x || !x.n) return;
       if (NAME_FIX[x.n]) x = Object.assign({}, x, { n: NAME_FIX[x.n] });
-      if (have[x.n]) return;
+      if (have[x.n]) {
+        // 本地条目存在但六维全为 0（占位数据）时，用补充数据里的真实数值覆盖
+        var cur = null;
+        for (var ci = 0; ci < PETS.length; ci++) if (PETS[ci].n === x.n) { cur = PETS[ci]; break; }
+        var allZero = cur && [cur.hp, cur.atk, cur.ma, cur.def, cur.md, cur.spe].every(function (v) { return !v; });
+        var hasReal = [x.hp, x.atk, x.ma, x.def, x.md, x.spe].every(function (v) { return typeof v === "number" && v > 0; });
+        if (cur && allZero && hasReal) {
+          cur.hp = x.hp; cur.atk = x.atk; cur.ma = x.ma;
+          cur.def = x.def; cur.md = x.md; cur.spe = x.spe;
+          if (!cur.t && x.t) { cur.t = x.t; cur.td = x.td || ""; }
+          cur._filled = true;
+        }
+        return;
+      }
       // 上游个别条目缺属性：用本地同名的属性补上（本地已有 450 条可比对，0 冲突）
       if (!x.el) {
         var local = null;
